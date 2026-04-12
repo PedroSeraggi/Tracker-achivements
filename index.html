@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🏆 Steam Trophy Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ══════════════════════════════════
+  SCREEN 1: LOGIN
+══════════════════════════════════ -->
+<div id="screen-login" class="screen">
+  <div class="login-box">
+    <div class="login-logo">
+      <svg width="60" height="60" viewBox="0 0 100 100">
+        <circle cx="50" cy="50" r="35" fill="none" stroke="#3a7acc" stroke-width="3"/>
+        <path d="M50 20 L55 40 L75 40 L60 55 L65 75 L50 62 L35 75 L40 55 L25 40 L45 40 Z" fill="#ffd700" stroke="#b8860b" stroke-width="2"/>
+        <text x="50" y="88" text-anchor="middle" fill="#3a7acc" font-size="10" font-family="monospace" font-weight="bold">100%</text>
+      </svg>
+      <h1>Steam<br><span>Trophy Tracker</span></h1>
+      <p>Steam API Integration · Rumo à Platina</p>
+    </div>
+
+    <div class="form-group" id="key-input-group">
+      <label>Steam API Key</label>
+      <input type="password" id="inp-key" placeholder="Sua chave da API Steam" autocomplete="off" spellcheck="false" />
+      <div class="hint">
+        Obtenha grátis em: <a href="https://steamcommunity.com/dev/apikey" target="_blank">steamcommunity.com/dev/apikey</a>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>Steam ID</label>
+      <input type="text" id="inp-steamid" placeholder="ex: 76561198012345678" autocomplete="off" spellcheck="false" />
+      <div class="hint">
+        Encontre em: <a href="https://steamid.io" target="_blank">steamid.io</a> — use o formato SteamID64
+      </div>
+    </div>
+
+    <button class="btn-login" onclick="startFetch()">🏆 CONECTAR À STEAM</button>
+
+    <div class="login-warn" style="background:#001020; border-color:#1e3a5f; color:#6a9acc;">
+      <strong>⚠ Segurança:</strong> Esta chave fica salva apenas no seu navegador (localStorage). Nunca compartilhe sua API Key publicamente — ela dá acesso a dados da sua conta Steam.
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════
+  SCREEN 2: LOADING
+══════════════════════════════════ -->
+<div id="screen-loading" class="screen hide">
+  <div class="loading-logo">
+    <svg width="60" height="60" viewBox="0 0 100 100" style="animation:pulse 1.5s infinite">
+      <circle cx="50" cy="50" r="35" fill="none" stroke="#3a7acc" stroke-width="3"/>
+      <path d="M50 20 L55 40 L75 40 L60 55 L65 75 L50 62 L35 75 L40 55 L25 40 L45 40 Z" fill="#ffd700" stroke="#b8860b" stroke-width="2"/>
+    </svg>
+  </div>
+  <div class="loading-title">Conectando à Steam</div>
+  <div class="loading-sub">Buscando seus jogos e conquistas...</div>
+  <div class="loading-bar-wrap">
+    <div class="loading-bar" id="loading-bar" style="width:0%"></div>
+  </div>
+  <div id="loading-status" class="mono">Iniciando...</div>
+  <div class="loading-games" id="loading-games"></div>
+</div>
+
+<!-- ══════════════════════════════════
+  SCREEN 3: DASHBOARD
+══════════════════════════════════ -->
+<div id="screen-dash" class="screen hide">
+
+  <!-- Header -->
+  <header class="dash-header">
+    <div class="dash-header-inner">
+      <div class="dash-header-top">
+        <svg width="30" height="30" viewBox="0 0 100 100" style="flex-shrink:0">
+          <circle cx="50" cy="50" r="35" fill="none" stroke="#3a7acc" stroke-width="3"/>
+          <path d="M50 20 L55 40 L75 40 L60 55 L65 75 L50 62 L35 75 L40 55 L25 40 L45 40 Z" fill="#ffd700" stroke="#b8860b" stroke-width="2"/>
+        </svg>
+        <div class="header-title">
+          <h1>Steam <span>Trophy Tracker</span></h1>
+          <p id="header-steamid" class="mono">Steam conectado</p>
+        </div>
+        <div class="header-stats">
+          <div class="hstat">
+            <div class="hstat-val" id="hstat-total" style="color:var(--accent)">0/0</div>
+            <div class="hstat-lbl">TROFÉUS</div>
+          </div>
+          <div class="hstat">
+            <div class="hstat-val" id="hstat-plat" style="color:var(--plat)">0</div>
+            <div class="hstat-lbl">PLATINAS</div>
+          </div>
+          <div class="hstat">
+            <div class="hstat-val" id="hstat-pct" style="color:var(--accent)">0%</div>
+            <div class="hstat-lbl">GERAL</div>
+          </div>
+        </div>
+        <div class="header-actions">
+          <button class="btn-sm" onclick="openGameLibrary()">+ Adicionar Jogos</button>
+          <button class="btn-sm" onclick="refreshData()">↺ Atualizar</button>
+          <button class="btn-sm" onclick="logout()">✕ Sair</button>
+        </div>
+      </div>
+      <div class="progress-strip">
+        <div class="progress-strip-fill" id="header-pbar" style="width:0%"></div>
+      </div>
+      <div class="dash-nav">
+        <button class="nav-tab active" onclick="showView('grid')" id="tab-grid">Todos os Jogos</button>
+        <button class="nav-tab" onclick="showView('overview')" id="tab-overview">Visão Geral</button>
+        <button class="nav-tab" onclick="showView('profile')" id="tab-profile">🏆 Perfil Gamer</button>
+        <button class="nav-tab" onclick="showView('guides')" id="tab-guides">📖 Guias</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main -->
+  <main class="dash-main">
+
+    <!-- ── GRID VIEW ── -->
+    <div id="view-grid">
+      <div class="filter-bar">
+        <span>FILTRAR:</span>
+        <button class="btn-filter active" onclick="setFilter('all',this)">Todos</button>
+        <button class="btn-filter" onclick="setFilter('started',this)">Em Progresso</button>
+        <button class="btn-filter" onclick="setFilter('notstarted',this)">Não Iniciados</button>
+        <button class="btn-filter" onclick="setFilter('platinum',this)">Platinados</button>
+        <span class="game-count" id="game-count"></span>
+      </div>
+      <div class="games-grid" id="games-grid"></div>
+    </div>
+
+    <!-- ── OVERVIEW VIEW ── -->
+    <div id="view-overview" class="hide">
+      <div class="overview-grid" id="overview-cards"></div>
+      <div id="platinum-showcase"></div>
+      <div id="most-played-showcase"></div>
+    </div>
+
+    <!-- ── PROFILE VIEW ── -->
+    <div id="view-profile" class="hide">
+      <div class="profile-container" id="profile-container"></div>
+    </div>
+
+    <!-- ── GUIDES VIEW ── -->
+    <div id="view-guides" class="hide">
+
+      <!-- Guides List -->
+      <div id="guides-list-view">
+        <div class="guides-topbar">
+          <div>
+            <h2 class="guides-heading">📖 Guias da Comunidade</h2>
+            <p class="guides-sub">Crie guias passo a passo para ajudar outros jogadores</p>
+          </div>
+          <button class="btn-create-guide" onclick="openGuideCreator()">+ Criar Guia</button>
+        </div>
+
+        <div class="guides-filter-bar">
+          <input type="text" id="guide-search" placeholder="🔍 Buscar guias..." oninput="renderGuidesList()" class="guide-search-input">
+          <select id="guide-game-filter" onchange="renderGuidesList()" class="guide-game-select">
+            <option value="">Todos os jogos</option>
+          </select>
+        </div>
+
+        <div id="guides-grid" class="guides-grid"></div>
+      </div>
+
+      <!-- Guide Creator / Editor -->
+      <div id="guides-create-view" class="hide">
+        <div class="guide-creator-topbar">
+          <button class="detail-back" onclick="closeGuideCreator()">← Voltar aos Guias</button>
+          <h2 class="guides-heading" id="guide-creator-title">Criar Novo Guia</h2>
+        </div>
+
+        <div class="guide-form">
+          <div class="guide-form-header">
+            <div class="form-row">
+              <div class="form-group-inline" style="flex:2">
+                <label class="form-label">Título do Guia</label>
+                <input type="text" id="gf-title" placeholder="ex: Como conseguir todas as conquistas..." class="guide-input" />
+              </div>
+              <div class="form-group-inline" style="flex:1">
+                <label class="form-label">Jogo (opcional)</label>
+                <select id="gf-game" class="guide-input guide-select" onchange="onGuideGameChange()">
+                  <option value="">— Selecione um jogo —</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-row" id="gf-achievement-row" style="display:none;margin-top:12px">
+              <div class="form-group-inline" style="flex:1">
+                <label class="form-label">Conquista (opcional)</label>
+                <select id="gf-achievement" class="guide-input guide-select">
+                  <option value="">— Guia geral do jogo —</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div id="guide-steps-container"></div>
+
+          <button class="btn-add-step" onclick="addGuideStep()">
+            + Adicionar Passo
+          </button>
+
+          <div class="guide-save-row">
+            <button class="btn-modal secondary" onclick="closeGuideCreator()">Cancelar</button>
+            <button class="btn-save-guide" onclick="saveGuide()">💾 Salvar Guia</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Guide Reader -->
+      <div id="guides-read-view" class="hide">
+        <button class="detail-back" id="guide-reader-back-btn" onclick="closeGuideReader()">← Voltar aos Guias</button>
+        <div id="guide-reader-content"></div>
+      </div>
+
+    </div>
+
+    <!-- ── DETAIL VIEW ── -->
+    <div id="view-detail">
+      <button class="detail-back" onclick="backToGrid()">← Voltar aos Jogos</button>
+      
+      <div class="detail-banner" id="detail-banner">
+        <div class="detail-banner-bg" id="detail-banner-bg"></div>
+        <div class="detail-banner-overlay"></div>
+        <div class="detail-banner-content">
+          <div class="detail-banner-top">
+            <div class="detail-banner-info">
+              <div class="detail-banner-tag" id="detail-tag"></div>
+              <div class="detail-banner-title" id="detail-title"></div>
+              <div class="detail-banner-stats" id="detail-banner-stats"></div>
+            </div>
+            <div class="detail-banner-pct">
+              <div class="detail-pct" id="detail-pct"></div>
+              <div class="detail-achcount" id="detail-achcount"></div>
+            </div>
+          </div>
+          <div class="detail-banner-bottom">
+            <div class="detail-trophy-row" id="detail-trophies"></div>
+            <div class="detail-hltb-row" id="detail-hltb-row" style="display:none;"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="ach-filters">
+        <button class="btn-ach-filter active" onclick="setAchFilter('all',this)">Todos</button>
+        <button class="btn-ach-filter" onclick="setAchFilter('unlocked',this)">Desbloqueados</button>
+        <button class="btn-ach-filter" onclick="setAchFilter('locked',this)">Bloqueados</button>
+      </div>
+
+      <div class="ach-list" id="ach-list"></div>
+    </div>
+
+  </main>
+</div>
+
+<script src="config.js"></script>
+<script src="script.js"></script>
+</body>
+</html>

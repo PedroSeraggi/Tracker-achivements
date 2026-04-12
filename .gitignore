@@ -1,0 +1,26 @@
+# Arquivos de configuração privada
+config.js
+.env
+.env.local
+
+# Dependências
+node_modules/
+
+# Arquivos de sistema
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Cache
+.cache/
+dist/
+build/
