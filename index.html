@@ -8,6 +8,78 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
+<style>
+/* ── Botão oficial "Login with Steam" ── */
+.btn-steam-login {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  width: 100%;
+  padding: 16px 24px;
+  background: linear-gradient(180deg, #4c6b22 0%, #3a5016 100%);
+  border: 1px solid #6b8c2a;
+  border-radius: 10px;
+  color: #c6d4df;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all .2s;
+  font-family: inherit;
+  margin-top: 8px;
+}
+.btn-steam-login:hover {
+  background: linear-gradient(180deg, #5a7e28 0%, #48621c 100%);
+  border-color: #8aab35;
+  color: #fff;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px #3a501620;
+}
+.btn-steam-login svg {
+  flex-shrink: 0;
+}
+.login-divider {
+  text-align: center;
+  color: var(--txt3);
+  font-size: 11px;
+  letter-spacing: 2px;
+  margin: 24px 0;
+  position: relative;
+}
+.login-divider::before,
+.login-divider::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  width: 38%;
+  height: 1px;
+  background: var(--b2);
+}
+.login-divider::before { left: 0; }
+.login-divider::after  { right: 0; }
+.login-features {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 24px;
+}
+.login-feature {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--txt2);
+  font-size: 13px;
+}
+.login-feature-icon {
+  font-size: 18px;
+  width: 28px;
+  text-align: center;
+  flex-shrink: 0;
+}
+</style>
 </head>
 <body>
 
@@ -23,29 +95,41 @@
         <text x="50" y="88" text-anchor="middle" fill="#3a7acc" font-size="10" font-family="monospace" font-weight="bold">100%</text>
       </svg>
       <h1>Steam<br><span>Trophy Tracker</span></h1>
-      <p>Steam API Integration · Rumo à Platina</p>
+      <p>Conquistas · Guias · Perfil Gamer</p>
     </div>
 
-    <div class="form-group" id="key-input-group">
-      <label>Steam API Key</label>
-      <input type="password" id="inp-key" placeholder="Sua chave da API Steam" autocomplete="off" spellcheck="false" />
-      <div class="hint">
-        Obtenha grátis em: <a href="https://steamcommunity.com/dev/apikey" target="_blank">steamcommunity.com/dev/apikey</a>
+    <div class="login-features">
+      <div class="login-feature">
+        <span class="login-feature-icon">🏆</span>
+        <span>Acompanhe conquistas de todos os seus jogos</span>
+      </div>
+      <div class="login-feature">
+        <span class="login-feature-icon">💎</span>
+        <span>Sistema de troféus Bronze, Prata, Ouro e Platina</span>
+      </div>
+      <div class="login-feature">
+        <span class="login-feature-icon">📖</span>
+        <span>Crie e leia guias para desbloquear conquistas difíceis</span>
+      </div>
+      <div class="login-feature">
+        <span class="login-feature-icon">👤</span>
+        <span>Perfil gamer com XP, títulos e jogos em destaque</span>
       </div>
     </div>
 
-    <div class="form-group">
-      <label>Steam ID</label>
-      <input type="text" id="inp-steamid" placeholder="ex: 76561198012345678" autocomplete="off" spellcheck="false" />
-      <div class="hint">
-        Encontre em: <a href="https://steamid.io" target="_blank">steamid.io</a> — use o formato SteamID64
-      </div>
-    </div>
+    <div class="login-divider">ENTRAR COM</div>
 
-    <button class="btn-login" onclick="startFetch()">🏆 CONECTAR À STEAM</button>
+    <a class="btn-steam-login" href="/auth/steam">
+      <!-- Logo oficial da Steam -->
+      <svg width="28" height="28" viewBox="0 0 233 233" xmlns="http://www.w3.org/2000/svg">
+        <path fill="#c6d4df" d="M116.5 0C52.2 0 0 52.2 0 116.5c0 55.2 38.5 101.6 90.4 113.3l30.5-74.4c-3-.8-5.8-2-8.4-3.6l-34.1 13.9C70.2 155.7 64 144.7 64 132.3c0-29 23.6-52.5 52.5-52.5 7.3 0 14.2 1.5 20.5 4.2l14.2-34.7C139.5 44.1 128.4 41 116.5 41c-41.7 0-75.5 33.8-75.5 75.5S74.8 192 116.5 192s75.5-33.8 75.5-75.5c0-5.2-.5-10.2-1.5-15.1l36.6-14.9C228.3 98.1 233 107 233 116.5 233 180.8 180.8 233 116.5 233S0 180.8 0 116.5 52.2 0 116.5 0z"/>
+        <circle fill="#c6d4df" cx="116.5" cy="132.3" r="26.5"/>
+      </svg>
+      Entrar com a Steam
+    </a>
 
-    <div class="login-warn" style="background:#001020; border-color:#1e3a5f; color:#6a9acc;">
-      <strong>⚠ Segurança:</strong> Esta chave fica salva apenas no seu navegador (localStorage). Nunca compartilhe sua API Key publicamente — ela dá acesso a dados da sua conta Steam.
+    <div class="login-warn" style="background:#001020; border-color:#1e3a5f; color:#6a9acc; margin-top:20px">
+      <strong>🔒 Segurança:</strong> O login usa o sistema oficial OpenID da Steam — o mesmo que grandes sites utilizam. Nunca compartilhamos sua senha ou dados privados.
     </div>
   </div>
 </div>

@@ -1,14 +1,6 @@
 // ══════════════════════════════════════════════════════════
 //  CONFIG & STATE
 // ══════════════════════════════════════════════════════════
-const PROXIES = [
-  'https://api.codetabs.com/v1/proxy?quest=',
-  'https://corsproxy.io/?',
-  'https://api.allorigins.win/raw?url=',
-];
-
-let currentProxyIndex = 0;
-function getProxy() { return PROXIES[currentProxyIndex]; }
 
 const COLOR_PALETTE = [
   { accent: '#3a7acc', dot: '#60a5fa', bg: 'linear-gradient(160deg,#0a1520,#1a2a40)' },
@@ -30,7 +22,7 @@ function getGameMetadata(appid, gameName) {
 }
 
 let state = {
-  apiKey: '',
+  apiKey: '', // mantido por compatibilidade interna, não usado para chamadas
   steamId: '',
   games: [],
   library: [],
@@ -65,11 +57,7 @@ let state = {
 // ── PERSISTENCE ──
 function save() {
   try {
-    // Only save API key to localStorage if it didn't come from config.js
-    const hasConfigKey = (typeof CONFIG !== 'undefined' && CONFIG.STEAM_API_KEY && CONFIG.STEAM_API_KEY !== 'SUA_API_KEY_AQUI');
-    if (!hasConfigKey) {
-      localStorage.setItem('steam-tracker-key', state.apiKey);
-    }
+    // API Key não é mais salva — fica no servidor (.env)
     localStorage.setItem('steam-tracker-sid', state.steamId);
     localStorage.setItem('steam-tracker-games', JSON.stringify(state.games));
     localStorage.setItem('steam-tracker-tracked', JSON.stringify([...state.trackedAppIds]));
@@ -80,11 +68,8 @@ function save() {
 
 function load() {
   try {
-    // Check for API key in config.js first (private config file)
-    const configKey = (typeof CONFIG !== 'undefined' && CONFIG.STEAM_API_KEY && CONFIG.STEAM_API_KEY !== 'SUA_API_KEY_AQUI')
-      ? CONFIG.STEAM_API_KEY
-      : '';
-    state.apiKey  = configKey || localStorage.getItem('steam-tracker-key') || '';
+    // SteamID é restaurado do localStorage (cache local)
+    // A API Key fica apenas no servidor — nunca no cliente
     state.steamId = localStorage.getItem('steam-tracker-sid') || '';
     const g = localStorage.getItem('steam-tracker-games');
     if (g) state.games = JSON.parse(g);
@@ -264,31 +249,25 @@ function show(id) {
   });
 }
 
-// ── STEAM FETCH ──
-async function steamFetch(url, attempt = 0) {
-  if (attempt >= PROXIES.length) {
-    throw new Error('Todos os proxies CORS falharam. Tente novamente mais tarde ou use uma extensão de navegador para desabilitar CORS temporariamente.');
+// ── STEAM FETCH — via servidor backend ──
+// O frontend nunca fala diretamente com a Steam API.
+// Todas as requisições passam pelo /api/steam do servidor,
+// que adiciona a API Key (guardada no .env) de forma segura.
+async function steamFetch(url) {
+  // Remove a API Key da URL — o servidor vai adicionar a sua
+  const urlObj = new URL(url);
+  urlObj.searchParams.delete('key');
+  const cleanUrl = urlObj.toString();
+
+  const res = await fetch('/api/steam?url=' + encodeURIComponent(cleanUrl));
+
+  if (res.status === 401) {
+    // Sessão expirou — volta para login
+    show('screen-login');
+    throw new Error('Sessão expirada. Faça login novamente com a Steam.');
   }
-  currentProxyIndex = attempt;
-  const proxy = getProxy();
-  const proxied = proxy + encodeURIComponent(url);
-  try {
-    const res = await fetch(proxied);
-    if (!res.ok) {
-      if (res.status === 403 || res.status === 429 || res.status === 401 || res.status === 502 || res.status === 503) {
-        return steamFetch(url, attempt + 1);
-      }
-      throw new Error(`HTTP ${res.status}`);
-    }
-    if (proxy.includes('allorigins')) {
-      const text = await res.text();
-      return JSON.parse(text);
-    }
-    return res.json();
-  } catch (err) {
-    if (attempt < PROXIES.length - 1) return steamFetch(url, attempt + 1);
-    throw err;
-  }
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
 }
 
 // ── HOW LONG TO BEAT API ──
@@ -421,16 +400,9 @@ function getUnlockedTitles(xp) {
   return GAMER_TITLES.filter(t => xp >= t.xp);
 }
 
-// ── MAIN FETCH FLOW ──
-async function startFetch() {
-  // Check if API key is from config.js (read-only)
-  const hasConfigKey = (typeof CONFIG !== 'undefined' && CONFIG.STEAM_API_KEY && CONFIG.STEAM_API_KEY !== 'SUA_API_KEY_AQUI');
-  const key = hasConfigKey ? CONFIG.STEAM_API_KEY : document.getElementById('inp-key').value.trim();
-  const sid = document.getElementById('inp-steamid').value.trim();
-  if (!key || !sid) { alert('Preencha a API Key e o Steam ID!'); return; }
-  state.apiKey  = key;
-  state.steamId = sid;
-  doFetch();
+// ── LOGIN — redireciona para o OpenID da Steam ──
+function startFetch() {
+  window.location.href = '/auth/steam';
 }
 
 async function refreshData() {
@@ -1383,20 +1355,17 @@ function backToGrid() {
 }
 
 function logout() {
-  if (!confirm('Deseja sair? As credenciais serão removidas do navegador.')) return;
-  localStorage.removeItem('steam-tracker-key');
+  if (!confirm('Deseja sair da sua conta Steam?')) return;
+  // Limpa cache local
   localStorage.removeItem('steam-tracker-sid');
   localStorage.removeItem('steam-tracker-games');
   localStorage.removeItem('steam-tracker-tracked');
   localStorage.removeItem('steam-tracker-profile');
   localStorage.removeItem('steam-tracker-user');
-  state = {
-    apiKey:'', steamId:'', games:[], library:[], trackedAppIds: new Set(),
-    currentFilter:'all', currentAchFilter:'all', currentGameId:null,
-    profile: { xp: 0, equippedTitle: 'novice', featuredGames: [], stats: {} },
-    userInfo: { personaname: '', avatar: '', profileurl: '', realname: '', loccountrycode: '' }
-  };
-  show('screen-login');
+  // Destroi a sessão no servidor e volta para o login
+  fetch('/api/logout', { method: 'POST' }).finally(() => {
+    window.location.href = '/';
+  });
 }
 
 // ══════════════════════════════════════════════════════════
@@ -1832,31 +1801,42 @@ if (!state.profile.equippedTitle) state.profile.equippedTitle = 'novice';
 if (!state.profile.stats) state.profile.stats = {};
 if (!state.userInfo) state.userInfo = { personaname: '', avatar: '', profileurl: '', realname: '', loccountrycode: '' };
 
-// Check if API key came from config.js
-const hasConfigKey = (typeof CONFIG !== 'undefined' && CONFIG.STEAM_API_KEY && CONFIG.STEAM_API_KEY !== 'SUA_API_KEY_AQUI');
+// ── INICIALIZAÇÃO — verifica sessão com o servidor ──
+// Em vez de checar localStorage para a API Key,
+// perguntamos ao servidor se há uma sessão Steam ativa.
+(async () => {
+  try {
+    const res = await fetch('/api/me');
+    const me  = await res.json();
 
-// Hide API key input if using config.js
-const keyInputGroup = document.getElementById('key-input-group');
-if (hasConfigKey && keyInputGroup) {
-  keyInputGroup.style.display = 'none';
-}
+    if (me.steamId) {
+      // Sessão ativa — atualiza state com dados frescos do servidor
+      state.steamId = me.steamId;
+      state.userInfo = {
+        personaname   : me.personaname    || state.userInfo.personaname || '',
+        avatar        : me.avatar         || state.userInfo.avatar      || '',
+        profileurl    : me.profileurl     || state.userInfo.profileurl  || '',
+        realname      : me.realname       || state.userInfo.realname    || '',
+        loccountrycode: me.loccountrycode || state.userInfo.loccountrycode || '',
+      };
+      save();
 
-if (state.apiKey && state.steamId) {
-  document.getElementById('inp-key').value = state.apiKey;
-  document.getElementById('inp-steamid').value = state.steamId;
-  if (state.games.length > 0) {
-    show('screen-dash');
-    renderDash();
-  } else if (state.trackedAppIds.size > 0) {
-    fetchTrackedGames();
-  } else {
-    show('screen-loading');
-    doFetch();
+      if (state.games.length > 0) {
+        show('screen-dash');
+        renderDash();
+      } else if (state.trackedAppIds.size > 0) {
+        fetchTrackedGames();
+      } else {
+        show('screen-loading');
+        doFetch();
+      }
+    } else {
+      // Sem sessão — mostra tela de login com botão Steam
+      show('screen-login');
+    }
+  } catch (e) {
+    // Servidor offline ou erro de rede
+    console.error('Erro ao verificar sessão:', e);
+    show('screen-login');
   }
-} else {
-  show('screen-login');
-}
-
-document.getElementById('inp-steamid').addEventListener('keydown', e => {
-  if (e.key === 'Enter') startFetch();
-});
+})();
