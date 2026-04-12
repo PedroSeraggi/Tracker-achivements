@@ -79,6 +79,224 @@
   text-align: center;
   flex-shrink: 0;
 }
+
+/* ── Search View ── */
+.search-hero {
+  text-align: center;
+  padding: 48px 20px 32px;
+  max-width: 680px;
+  margin: 0 auto;
+}
+.search-hero-icon { font-size: 48px; margin-bottom: 16px; }
+.search-hero-title { font-size: 22px; font-weight: 700; color: #fff; margin-bottom: 8px; }
+.search-hero-sub   { font-size: 13px; color: var(--txt2); margin-bottom: 28px; }
+.search-bar-wrap {
+  display: flex;
+  gap: 10px;
+  max-width: 580px;
+  margin: 0 auto;
+}
+.search-player-input {
+  flex: 1;
+  background: var(--bg3);
+  border: 1px solid var(--b2);
+  border-radius: 8px;
+  padding: 12px 16px;
+  color: var(--txt);
+  font-size: 14px;
+  outline: none;
+  transition: border-color .2s;
+}
+.search-player-input:focus { border-color: var(--accent); }
+.btn-search-player {
+  background: var(--accent);
+  border: none;
+  border-radius: 8px;
+  padding: 12px 22px;
+  color: #fff;
+  font-weight: 700;
+  font-size: 14px;
+  white-space: nowrap;
+  transition: opacity .2s;
+}
+.btn-search-player:hover { opacity: .85; }
+.btn-search-player:disabled { opacity: .4; cursor: not-allowed; }
+.search-bar-wrap {
+  position: relative;
+}
+.search-error {
+  margin-top: 14px;
+  color: #f87171;
+  font-size: 13px;
+  background: #200a0a;
+  border: 1px solid #5a1a1a;
+  border-radius: 8px;
+  padding: 10px 16px;
+}
+
+/* Card do jogador encontrado */
+.found-player-card {
+  max-width: 680px;
+  margin: 0 auto 32px;
+  background: var(--bg2);
+  border: 1px solid var(--b2);
+  border-radius: 14px;
+  padding: 24px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+.found-avatar {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: var(--bg3);
+  object-fit: cover;
+  flex-shrink: 0;
+  border: 2px solid var(--b3);
+}
+.found-avatar-placeholder {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: var(--bg3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32px;
+  flex-shrink: 0;
+}
+.found-info { flex: 1; min-width: 0; }
+.found-name { font-size: 20px; font-weight: 700; color: #fff; }
+.found-realname { font-size: 13px; color: var(--txt2); margin-top: 2px; }
+.found-steamid  { font-size: 11px; color: var(--txt3); font-family: monospace; margin-top: 6px; }
+.found-links    { display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
+.found-link {
+  font-size: 12px;
+  color: var(--accent);
+  text-decoration: none;
+  border: 1px solid var(--accent)44;
+  border-radius: 6px;
+  padding: 4px 10px;
+  transition: background .2s;
+}
+.found-link:hover { background: var(--accent)22; }
+.found-private-badge {
+  font-size: 11px;
+  color: #f87171;
+  background: #200a0a;
+  border: 1px solid #5a1a1a;
+  border-radius: 6px;
+  padding: 4px 10px;
+}
+.btn-load-games {
+  background: var(--accent);
+  border: none;
+  border-radius: 8px;
+  padding: 10px 20px;
+  color: #fff;
+  font-weight: 700;
+  font-size: 13px;
+  transition: opacity .2s;
+  white-space: nowrap;
+}
+.btn-load-games:hover    { opacity: .85; }
+.btn-load-games:disabled { opacity: .4; cursor: not-allowed; }
+
+/* Seção de jogos do jogador pesquisado */
+.search-games-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 20px 16px;
+  flex-wrap: wrap;
+}
+.search-games-title { font-size: 14px; font-weight: 600; color: var(--txt2); letter-spacing: 1px; }
+.search-games-filters { display: flex; gap: 8px; }
+.readonly-badge {
+  display: inline-block;
+  font-size: 10px;
+  color: var(--txt3);
+  background: var(--bg3);
+  border: 1px solid var(--b2);
+  border-radius: 4px;
+  padding: 2px 8px;
+  letter-spacing: 1px;
+  margin-left: 8px;
+}
+
+/* ── Compare Button ── */
+.btn-compare {
+  background: linear-gradient(135deg, #3a7acc, #7c3aed);
+  border: none;
+  border-radius: 8px;
+  padding: 9px 18px;
+  color: #fff;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  transition: opacity .2s, transform .1s;
+  white-space: nowrap;
+}
+.btn-compare:hover    { opacity: .85; transform: translateY(-1px); }
+.btn-compare:disabled { opacity: .4; cursor: not-allowed; transform: none; }
+
+/* ── Compare View ── */
+.compare-topbar { display:flex; align-items:center; gap:16px; padding:16px 20px 8px; flex-wrap:wrap; }
+.compare-title  { font-size:16px; font-weight:700; color:#fff; }
+.compare-header-cards { display:flex; gap:16px; padding:16px 20px; flex-wrap:wrap; align-items:center; }
+.compare-player-card {
+  flex:1; min-width:200px;
+  background:var(--bg2); border:1px solid var(--b2); border-radius:12px;
+  padding:16px 18px; display:flex; align-items:center; gap:14px;
+}
+.compare-player-card.me   { border-color:#3a7acc55; }
+.compare-player-card.them { border-color:#7c3aed55; }
+.compare-player-avatar    { width:48px; height:48px; border-radius:50%; object-fit:cover; flex-shrink:0; }
+.compare-player-avatar-ph {
+  width:48px; height:48px; border-radius:50%; background:var(--bg3);
+  display:flex; align-items:center; justify-content:center; font-size:22px; flex-shrink:0;
+}
+.compare-player-info { flex:1; min-width:0; }
+.compare-player-name { font-weight:700; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.compare-player-pct  { font-size:28px; font-weight:900; line-height:1.1; }
+.compare-player-sub  { font-size:12px; color:var(--txt2); }
+.compare-vs { font-size:20px; font-weight:900; color:var(--txt3); padding:0 4px; }
+.compare-pbar-wrap  { display:flex; gap:12px; padding:0 20px 16px; align-items:center; }
+.compare-pbar-side  { flex:1; }
+.compare-pbar-label { font-size:11px; color:var(--txt2); margin-bottom:4px; }
+.compare-pbar-track { height:6px; background:var(--b2); border-radius:99px; overflow:hidden; }
+.compare-pbar-fill-me   { height:100%; background:#3a7acc; border-radius:99px; transition:width .4s; }
+.compare-pbar-fill-them { height:100%; background:#7c3aed; border-radius:99px; transition:width .4s; }
+.compare-pbar-center    { font-size:11px; color:var(--txt3); text-align:center; width:20px; flex-shrink:0; }
+.compare-filters { display:flex; gap:8px; padding:0 20px 16px; flex-wrap:wrap; }
+.compare-list    { padding:0 20px 40px; display:flex; flex-direction:column; gap:6px; }
+.compare-item {
+  display:grid; grid-template-columns:40px 1fr 40px;
+  align-items:center; gap:10px;
+  background:var(--bg2); border:1px solid var(--b2);
+  border-radius:10px; padding:10px 14px;
+}
+.compare-item.both      { border-color:#22cc6633; background:#22cc660a; }
+.compare-item.only-me   { border-color:#3a7acc44; }
+.compare-item.only-them { border-color:#7c3aed44; }
+.compare-item-center { display:flex; align-items:center; gap:10px; min-width:0; }
+.compare-item-icon   { width:36px; height:36px; border-radius:6px; flex-shrink:0; object-fit:cover; }
+.compare-item-icon-ph {
+  width:36px; height:36px; border-radius:6px; background:var(--bg3);
+  display:flex; align-items:center; justify-content:center; font-size:16px; flex-shrink:0;
+}
+.compare-item-text { min-width:0; }
+.compare-item-name { font-size:13px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.compare-item-desc { font-size:11px; color:var(--txt2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.compare-item-pct  { font-size:10px; color:var(--txt3); margin-top:2px; }
+.compare-check {
+  width:36px; height:36px; border-radius:8px;
+  display:flex; align-items:center; justify-content:center;
+  font-size:16px; border:2px solid var(--b2); background:var(--bg3); flex-shrink:0;
+}
+.compare-check.me-yes   { background:#3a7acc22; border-color:#3a7acc; }
+.compare-check.them-yes { background:#7c3aed22; border-color:#7c3aed; }
 </style>
 </head>
 <body>
@@ -186,7 +404,7 @@
         </div>
         <div class="header-actions">
           <button class="btn-sm" onclick="openGameLibrary()">+ Adicionar Jogos</button>
-          <button class="btn-sm" onclick="refreshData()">↺ Atualizar</button>
+          <button class="btn-sm" onclick="refreshData(true)" title="Recarregar dados da Steam">↺ Atualizar</button>
           <button class="btn-sm" onclick="logout()">✕ Sair</button>
         </div>
       </div>
@@ -198,6 +416,7 @@
         <button class="nav-tab" onclick="showView('overview')" id="tab-overview">Visão Geral</button>
         <button class="nav-tab" onclick="showView('profile')" id="tab-profile">🏆 Perfil Gamer</button>
         <button class="nav-tab" onclick="showView('guides')" id="tab-guides">📖 Guias</button>
+        <button class="nav-tab" onclick="showView('search')" id="tab-search">🔍 Buscar Jogadores</button>
       </div>
     </div>
   </header>
@@ -305,6 +524,103 @@
 
     </div>
 
+    <!-- ── SEARCH VIEW ── -->
+    <div id="view-search" class="hide">
+
+      <!-- Sub-view: busca + resultado -->
+      <div id="search-home-view">
+        <div class="search-hero">
+          <div class="search-hero-icon">🔍</div>
+          <h2 class="search-hero-title">Buscar Jogadores</h2>
+          <p class="search-hero-sub">Pesquise por SteamID64, URL personalizada ou link do perfil Steam</p>
+          <div class="search-bar-wrap">
+            <input
+              type="text"
+              id="search-player-input"
+              class="search-player-input"
+              placeholder="ex: 76561198012345678  ou  meuNomeSteam  ou  steamcommunity.com/id/nome"
+              autocomplete="off"
+              spellcheck="false"
+              onkeydown="if(event.key==='Enter') searchPlayer()"
+            />
+            <button class="btn-search-player" onclick="searchPlayer()">Buscar</button>
+          </div>
+          <div id="search-error" class="search-error hide"></div>
+        </div>
+
+        <!-- Card do jogador encontrado -->
+        <div id="search-result" class="hide">
+          <div class="found-player-card" id="found-player-card"></div>
+          <div id="search-games-section" class="hide">
+            <div class="search-games-header">
+              <span id="search-games-title">Jogos</span>
+              <div class="search-games-filters">
+                <button class="btn-filter active" onclick="setSearchFilter('all',this)">Todos</button>
+                <button class="btn-filter" onclick="setSearchFilter('started',this)">Em Progresso</button>
+                <button class="btn-filter" onclick="setSearchFilter('platinum',this)">Platinados</button>
+              </div>
+            </div>
+            <div class="games-grid" id="search-games-grid"></div>
+          </div>
+        </div>
+      </div><!-- /search-home-view -->
+
+      <!-- Sub-view: perfil do jogador pesquisado (somente leitura) -->
+      <div id="search-profile-detail" class="hide">
+        <button class="detail-back" onclick="backToSearchResult()">← Voltar à Busca</button>
+        <div id="search-profile-container" class="profile-container"></div>
+      </div>
+
+      <!-- Sub-view: conquistas de um jogo do jogador pesquisado -->
+      <div id="search-game-detail" class="hide">
+        <button class="detail-back" onclick="backToSearchedProfile()">← Voltar ao Perfil</button>
+        <div class="detail-banner" id="search-detail-banner">
+          <div class="detail-banner-bg" id="search-detail-banner-bg"></div>
+          <div class="detail-banner-overlay"></div>
+          <div class="detail-banner-content">
+            <div class="detail-banner-top">
+              <div class="detail-banner-info">
+                <div class="detail-banner-tag" id="search-detail-tag"></div>
+                <div class="detail-banner-title" id="search-detail-title"></div>
+                <div class="detail-banner-stats" id="search-detail-stats"></div>
+              </div>
+              <div class="detail-banner-pct">
+                <div class="detail-pct" id="search-detail-pct"></div>
+                <div class="detail-achcount" id="search-detail-achcount"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="ach-filters" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+          <div style="display:flex;gap:8px;">
+            <button class="btn-ach-filter active" onclick="setSearchAchFilter('all',this)">Todos</button>
+            <button class="btn-ach-filter" onclick="setSearchAchFilter('unlocked',this)">Desbloqueados</button>
+            <button class="btn-ach-filter" onclick="setSearchAchFilter('locked',this)">Bloqueados</button>
+          </div>
+          <button class="btn-compare" id="btn-compare" onclick="openCompareView()">⚔️ Comparar Comigo</button>
+        </div>
+        <div class="ach-list" id="search-ach-list"></div>
+      </div><!-- /search-game-detail -->
+
+      <!-- Sub-view: comparação lado a lado -->
+      <div id="search-compare-view" class="hide">
+        <div class="compare-topbar">
+          <button class="detail-back" onclick="backFromCompare()">← Voltar ao Jogo</button>
+          <div class="compare-title" id="compare-title">Comparação</div>
+        </div>
+        <div class="compare-header-cards" id="compare-header-cards"></div>
+        <div class="compare-filters">
+          <button class="btn-filter active" onclick="setCompareFilter('all',this)">Todos</button>
+          <button class="btn-filter" onclick="setCompareFilter('only_me',this)">Só eu tenho</button>
+          <button class="btn-filter" onclick="setCompareFilter('only_them',this)">Só ele(a) tem</button>
+          <button class="btn-filter" onclick="setCompareFilter('both',this)">Ambos temos</button>
+          <button class="btn-filter" onclick="setCompareFilter('neither',this)">Nenhum tem</button>
+        </div>
+        <div id="compare-list" class="compare-list"></div>
+      </div><!-- /search-compare-view -->
+
+    </div><!-- /view-search -->
+
     <!-- ── DETAIL VIEW ── -->
     <div id="view-detail">
       <button class="detail-back" onclick="backToGrid()">← Voltar aos Jogos</button>
@@ -343,7 +659,6 @@
   </main>
 </div>
 
-<script src="config.js"></script>
 <script src="script.js"></script>
 </body>
 </html>

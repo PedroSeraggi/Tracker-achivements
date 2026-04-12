@@ -21,6 +21,8 @@ function getGameMetadata(appid, gameName) {
   return { title: gameName, subtitle: '', year: '', bg: colors.bg, accent: colors.accent, dot: colors.dot };
 }
 
+const STORAGE_KEY = 'steamTracker_sessionCache';
+
 let state = {
   apiKey: '', // mantido por compatibilidade interna, não usado para chamadas
   steamId: '',
@@ -86,6 +88,52 @@ function load() {
   } catch(e) {
     console.error('Error loading state:', e);
   }
+}
+
+// ── SESSION CACHE ──
+// Cache persistente para evitar recarregar todos os jogos (limpo apenas no logout ou "Atualizar")
+function saveSessionCache() {
+  try {
+    const cache = {
+      steamId: state.steamId,
+      games: state.games,
+      trackedAppIds: [...state.trackedAppIds],
+      userInfo: state.userInfo,
+      profile: state.profile,
+      timestamp: Date.now()
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(cache));
+  } catch(e) {}
+}
+
+function loadSessionCache() {
+  try {
+    const cached = localStorage.getItem(STORAGE_KEY);
+    if (!cached) return false;
+    
+    const data = JSON.parse(cached);
+    
+    // Verifica se o cache é do mesmo usuário
+    if (data.steamId !== state.steamId) return false;
+    
+    // Restaura os dados
+    state.games = data.games || [];
+    state.trackedAppIds = new Set(data.trackedAppIds || []);
+    state.userInfo = data.userInfo || state.userInfo;
+    state.profile = data.profile || state.profile;
+    
+    console.log('[Cache] Dados restaurados:', state.games.length, 'jogos');
+    return true;
+  } catch(e) {
+    console.error('[Cache] Erro ao carregar:', e);
+    return false;
+  }
+}
+
+function clearSessionCache() {
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch(e) {}
 }
 
 // ── FETCH STEAM USER INFO ──
@@ -405,7 +453,19 @@ function startFetch() {
   window.location.href = '/auth/steam';
 }
 
-async function refreshData() {
+async function refreshData(force = false) {
+  if (!force) {
+    // Tenta carregar do cache primeiro
+    const hasCache = loadSessionCache();
+    if (hasCache && state.games.length > 0) {
+      show('screen-dash');
+      renderDash();
+      return;
+    }
+  }
+  
+  // Força recarregar da Steam
+  clearSessionCache();
   show('screen-loading');
   await fetchTrackedGames();
 }
@@ -544,6 +604,7 @@ async function fetchTrackedGames() {
 
   state.games = results;
   save();
+  saveSessionCache(); // Salva no cache da sessão para evitar recarregar no F5
   setLoadingProgress(100, 'Concluído!');
   setTimeout(() => { show('screen-dash'); renderDash(); }, 600);
 }
@@ -765,31 +826,6 @@ function loadFeaturedCoverImage(appid, fallbackBg) {
   setTimeout(tryNext, 10);
 }
 
-function loadCoverImage(appid, fallbackBg) {
-  const coverEl = document.getElementById(`cover-${appid}`);
-  if (!coverEl) return;
-  const imageUrls = [
-    `https://steamcdn-a.akamaihd.net/steam/apps/${appid}/library_600x900.jpg`,
-    `https://cdn.akamai.steamstatic.com/steam/apps/${appid}/library_600x900.jpg`,
-    `https://steamcdn-a.akamaihd.net/steam/apps/${appid}/header.jpg`,
-    `https://cdn.akamai.steamstatic.com/steam/apps/${appid}/header.jpg`,
-    `https://steamcdn-a.akamaihd.net/steam/apps/${appid}/capsule_231x87.jpg`,
-  ];
-  let urlIndex = 0;
-  function tryNextImage() {
-    if (urlIndex >= imageUrls.length) return;
-    const img = new Image();
-    img.onload = () => {
-      coverEl.style.setProperty('background-image', `url('${imageUrls[urlIndex]}')`, 'important');
-      coverEl.style.backgroundSize = 'cover';
-      coverEl.style.backgroundPosition = 'center';
-    };
-    img.onerror = () => { urlIndex++; tryNextImage(); };
-    img.src = imageUrls[urlIndex];
-  }
-  setTimeout(tryNextImage, 10);
-}
-
 function shortName(title) {
   if (!title) return '';
   if (title.length > 20) {
@@ -997,14 +1033,19 @@ function loadBannerImage(appid, fallbackBg) {
 
 // ── VIEWS ──
 function showView(v) {
-  const views = ['grid','overview','profile','guides'];
+  console.log('[showView] Mudando para view:', v);
+  const views = ['grid','overview','profile','guides','search'];
   views.forEach(name => {
     const el = document.getElementById(`view-${name}`);
     if (el) el.classList.toggle('hide', v !== name);
     const tab = document.getElementById(`tab-${name}`);
     if (tab) tab.classList.toggle('active', v === name);
   });
-  document.getElementById('view-detail').style.display = v === 'detail' ? 'block' : 'none';
+  const detailEl = document.getElementById('view-detail');
+  if (detailEl) {
+    detailEl.style.display = v === 'detail' ? 'block' : 'none';
+    console.log('[showView] Detail display:', detailEl.style.display);
+  }
   if (v === 'profile') renderProfile();
   if (v === 'guides')  { populateGuideFilters(); renderGuidesList(); }
 }
@@ -1167,8 +1208,14 @@ function renderProfile() {
 
 // ── GAME DETAIL ──
 function openGame(appid) {
+  console.log('[openGame] Abrindo jogo:', appid);
+  console.log('[openGame] Total de jogos em state:', state.games.length);
   const g = state.games.find(g => g.appid === appid);
-  if (!g) return;
+  if (!g) {
+    console.error('[openGame] Jogo não encontrado:', appid);
+    return;
+  }
+  console.log('[openGame] Jogo encontrado:', g.title);
   state.currentGameId = appid;
   state.currentAchFilter = 'all';
   document.querySelectorAll('.btn-ach-filter').forEach(b => b.classList.remove('active'));
@@ -1791,8 +1838,745 @@ function escapeHtml(text) {
 // ══════════════════════════════════════════════════════════
 //  INIT
 // ══════════════════════════════════════════════════════════
-load();
-loadGuides();
+// ══════════════════════════════════════════════════════════
+//  BUSCA DE JOGADORES — somente leitura
+// ══════════════════════════════════════════════════════════
+
+let searchedPlayer = null;   // perfil do jogador pesquisado
+let searchedGames  = [];     // jogos carregados
+let searchCurrentFilter = 'all';
+let searchCurrentAchFilter = 'all';
+let searchCurrentGame = null;
+
+function showSearchError(msg) {
+  const el = document.getElementById('search-error');
+  el.textContent = msg;
+  el.classList.remove('hide');
+}
+function hideSearchError() {
+  document.getElementById('search-error').classList.add('hide');
+}
+
+// ══════════════════════════════════════════════════════════
+//  BUSCA DE JOGADORES — somente leitura
+// ══════════════════════════════════════════════════════════
+
+async function searchPlayer() {
+  const input = document.getElementById('search-player-input');
+  const query = input.value.trim();
+  if (!query) return;
+
+  const btn = document.querySelector('.btn-search-player');
+  btn.disabled = true;
+  btn.textContent = 'Buscando...';
+  hideSearchError();
+  document.getElementById('search-result').classList.add('hide');
+
+  try {
+    const res = await fetch('/api/player/search?query=' + encodeURIComponent(query));
+    const data = await res.json();
+
+    if (!res.ok) {
+      showSearchError(data.error || 'Jogador não encontrado.');
+      return;
+    }
+
+    searchedPlayer = data;
+    searchedGames = [];
+    renderFoundPlayer();
+    document.getElementById('search-result').classList.remove('hide');
+    document.getElementById('search-games-section').classList.add('hide');
+  } catch (e) {
+    showSearchError('Erro de conexão. Verifique se o servidor está rodando.');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Buscar';
+  }
+}
+
+function renderFoundPlayer() {
+  const p = searchedPlayer;
+  const isPublic = p.communityvisibilitystate === 3;
+  const card = document.getElementById('found-player-card');
+
+  card.innerHTML = `
+    ${p.avatar
+      ? `<img class="found-avatar" src="${p.avatar}" alt="${escapeHtml(p.personaname)}">`
+      : `<div class="found-avatar-placeholder">🎮</div>`}
+    <div class="found-info">
+      <div class="found-name">${escapeHtml(p.personaname)}</div>
+      ${p.realname ? `<div class="found-realname">${escapeHtml(p.realname)}</div>` : ''}
+      <div class="found-steamid">SteamID: ${p.steamId}</div>
+      <div class="found-links">
+        ${p.profileurl
+          ? `<a class="found-link" href="${p.profileurl}" target="_blank">🔗 Ver na Steam</a>`
+          : ''}
+        ${!isPublic
+          ? `<span class="found-private-badge">🔒 Perfil Privado</span>`
+          : ''}
+      </div>
+    </div>
+    ${isPublic
+      ? `<button class="btn-load-games" id="btn-load-games" onclick="showSearchedProfile()">👥 Ver Perfil</button>`
+      : ''}
+  `;
+}
+
+async function loadSearchedGames() {
+  const btn = document.getElementById('btn-load-games');
+  if (btn) { btn.disabled = true; btn.textContent = 'Carregando...'; }
+
+  try {
+    const res  = await fetch(`/api/player/${searchedPlayer.steamId}/games`);
+    const data = await res.json();
+
+    if (!res.ok) {
+      showSearchError(data.error || 'Não foi possível carregar os jogos.');
+      if (btn) { btn.disabled = false; btn.textContent = '🎮 Ver Jogos'; }
+      return;
+    }
+
+    // Para cada jogo, busca contagem de conquistas
+    const gamesSection = document.getElementById('search-games-section');
+    const gamesGrid    = document.getElementById('search-games-grid');
+    const gamesTitle   = document.getElementById('search-games-title');
+    gamesTitle.innerHTML = `JOGOS DE <strong style="color:#fff">${escapeHtml(searchedPlayer.personaname)}</strong>
+      <span class="readonly-badge">SOMENTE LEITURA</span>`;
+
+    gamesSection.classList.remove('hide');
+    gamesGrid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--txt2);font-size:13px;">
+      ⏳ Carregando conquistas de ${data.games.length} jogos...
+    </div>`;
+
+    // Busca achievements em lotes para não sobrecarregar
+    const games = data.games.slice(0, 200); // limita a 200 jogos
+    const results = [];
+    const BATCH = 8;
+
+    for (let i = 0; i < games.length; i += BATCH) {
+      const batch = games.slice(i, i + BATCH);
+      const settled = await Promise.allSettled(batch.map(async g => {
+        try {
+          const r = await fetch(`/api/player/${searchedPlayer.steamId}/achievements/${g.appid}`);
+          const d = await r.json();
+          if (r.ok) return { ...g, done: d.done, total: d.total, pct: d.pct, hasAch: d.total > 0 };
+        } catch {}
+        return { ...g, done: 0, total: 0, pct: 0, hasAch: false };
+      }));
+      settled.forEach((s, idx) => {
+        if (s.status === 'fulfilled') results.push(s.value || { ...batch[idx], done:0, total:0, pct:0, hasAch:false });
+      });
+      // Atualiza progresso
+      gamesGrid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--txt2);font-size:13px;">
+        ⏳ ${Math.min(i + BATCH, games.length)} / ${games.length} jogos carregados...
+      </div>`;
+    }
+
+    searchedGames = results;
+    renderSearchGamesGrid();
+    if (btn) { btn.textContent = '✓ Carregado'; }
+  } catch (e) {
+    showSearchError('Erro ao carregar jogos.');
+    if (btn) { btn.disabled = false; btn.textContent = '🏆 Ver Perfil Gamer'; }
+  }
+}
+
+async function showSearchedProfile() {
+  const btn = document.getElementById('btn-load-games');
+  if (btn) { btn.disabled = true; btn.textContent = 'Carregando...'; }
+
+  // Se já temos os jogos carregados, só mostra o perfil
+  if (searchedGames.length > 0) {
+    renderSearchedProfile();
+    document.getElementById('search-result').classList.add('hide');
+    document.getElementById('search-profile-detail').classList.remove('hide');
+    if (btn) { btn.disabled = false; btn.textContent = '🏆 Ver Perfil Gamer'; }
+    return;
+  }
+
+  // Carrega os jogos primeiro
+  try {
+    const res  = await fetch(`/api/player/${searchedPlayer.steamId}/games`);
+    const data = await res.json();
+
+    if (!res.ok) {
+      showSearchError(data.error || 'Não foi possível carregar os jogos.');
+      if (btn) { btn.disabled = false; btn.textContent = '🏆 Ver Perfil Gamer'; }
+      return;
+    }
+
+    // Busca conquistas em lotes
+    const games = data.games.slice(0, 200);
+    const results = [];
+    const BATCH = 8;
+
+    for (let i = 0; i < games.length; i += BATCH) {
+      const batch = games.slice(i, i + BATCH);
+      const settled = await Promise.allSettled(batch.map(async g => {
+        try {
+          const r = await fetch(`/api/player/${searchedPlayer.steamId}/achievements/${g.appid}`);
+          const d = await r.json();
+          if (r.ok) return { ...g, done: d.done, total: d.total, pct: d.pct, hasAch: d.total > 0, achievements: d.achievements };
+        } catch {}
+        return { ...g, done: 0, total: 0, pct: 0, hasAch: false };
+      }));
+      settled.forEach((s, idx) => {
+        if (s.status === 'fulfilled') results.push(s.value || { ...batch[idx], done:0, total:0, pct:0, hasAch:false });
+      });
+    }
+
+    searchedGames = results;
+    renderSearchedProfile();
+    document.getElementById('search-result').classList.add('hide');
+    document.getElementById('search-profile-detail').classList.remove('hide');
+  } catch (e) {
+    showSearchError('Erro ao carregar jogos.');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '🏆 Ver Perfil Gamer'; }
+  }
+}
+
+function renderSearchedProfile() {
+  const container = document.getElementById('search-profile-container');
+  if (!container) return;
+
+  const p = searchedPlayer;
+  const games = searchedGames;
+
+  // Calcula estatísticas
+  const platGames = games.filter(g => g.pct === 100 && g.total > 0);
+  const totalAch = games.reduce((s, g) => s + (g.total || 0), 0);
+  const doneAch = games.reduce((s, g) => s + (g.done || 0), 0);
+  const gamesWithAch = games.filter(g => g.total > 0).length;
+
+  // Calcula XP estimado (simplificado)
+  const xp = platGames.length * 100 + doneAch * 10;
+
+  // Títulos baseados em XP
+  let title = { name: 'Novato', color: '#888' };
+  if (xp >= 5000) title = { name: '🏆 Lendário', color: 'var(--plat)' };
+  else if (xp >= 3000) title = { name: '💎 Mestre', color: '#9d4edd' };
+  else if (xp >= 1500) title = { name: '🥇 Expert', color: 'var(--gold)' };
+  else if (xp >= 500) title = { name: '🥈 Veterano', color: 'var(--silv)' };
+
+  // Conquistas raras (< 5% globais)
+  const rareAchs = [];
+  games.forEach(g => {
+    if (g.achievements) {
+      g.achievements.forEach(a => {
+        if (a.unlocked && a.globalPct !== undefined && a.globalPct < 5) {
+          rareAchs.push({ ...a, game: g.name });
+        }
+      });
+    }
+  });
+  rareAchs.sort((a, b) => (a.globalPct || 100) - (b.globalPct || 100));
+  const topRare = rareAchs.slice(0, 5);
+
+  const displayName = p.personaname || 'Gamer';
+  const realName = p.realname ? ` (${p.realname})` : '';
+  const avatar = p.avatar;
+
+  container.innerHTML = `
+    <div class="profile-hero">
+      <div class="profile-avatar" style="${avatar ? `background:url('${avatar}') center/cover no-repeat;` : ''}">
+        ${!avatar ? '🎮' : ''}
+      </div>
+      <div class="profile-info">
+        <div class="profile-name">${escapeHtml(displayName)}${escapeHtml(realName)}</div>
+        <div class="profile-title" style="color:${title.color}">${title.name}</div>
+        <div class="profile-xp">
+          💎 ${xp.toLocaleString()} XP (estimado)
+        </div>
+        <div style="margin-top:12px;">
+          <a href="${p.profileurl}" target="_blank" style="color:var(--accent);font-size:12px;text-decoration:none;">🔗 Ver perfil na Steam →</a>
+        </div>
+      </div>
+    </div>
+    <div class="profile-stats-grid">
+      <div class="profile-stat-card">
+        <div class="profile-stat-icon">🎮</div>
+        <div class="profile-stat-value">${games.length}</div>
+        <div class="profile-stat-label">Jogos</div>
+      </div>
+      <div class="profile-stat-card">
+        <div class="profile-stat-icon">🏆</div>
+        <div class="profile-stat-value">${doneAch}</div>
+        <div class="profile-stat-label">Conquistas</div>
+      </div>
+      <div class="profile-stat-card">
+        <div class="profile-stat-icon" style="color:var(--plat)">💎</div>
+        <div class="profile-stat-value" style="color:var(--plat)">${platGames.length}</div>
+        <div class="profile-stat-label">Platinas</div>
+      </div>
+      <div class="profile-stat-card">
+        <div class="profile-stat-icon" style="color:var(--gold)">🥇</div>
+        <div class="profile-stat-value" style="color:var(--gold)">${Math.floor(doneAch / 50)}</div>
+        <div class="profile-stat-label">Ouros (est.)</div>
+      </div>
+      <div class="profile-stat-card">
+        <div class="profile-stat-icon" style="color:var(--silv)">🥈</div>
+        <div class="profile-stat-value" style="color:var(--silv)">${Math.floor(doneAch / 20)}</div>
+        <div class="profile-stat-label">Pratas (est.)</div>
+      </div>
+      <div class="profile-stat-card">
+        <div class="profile-stat-icon" style="color:var(--bron)">🥉</div>
+        <div class="profile-stat-value" style="color:var(--bron)">${Math.floor(doneAch / 10)}</div>
+        <div class="profile-stat-label">Bronzes (est.)</div>
+      </div>
+      <div class="profile-stat-card">
+        <div class="profile-stat-icon">⭐</div>
+        <div class="profile-stat-value">${platGames.length}</div>
+        <div class="profile-stat-label">100% Completos</div>
+      </div>
+      <div class="profile-stat-card">
+        <div class="profile-stat-icon">🔥</div>
+        <div class="profile-stat-value">${rareAchs.length}</div>
+        <div class="profile-stat-label">Raras (<5%)</div>
+      </div>
+    </div>
+    <div class="cv-section">
+      <div class="cv-header">
+        <div class="cv-name">Jogos Platinados</div>
+        <div class="cv-stats-row">
+          <span>⭐ ${platGames.length} jogos platinados</span>
+        </div>
+      </div>
+      <div class="cv-body">
+        <div class="cv-column" style="flex: 2;">
+          ${platGames.length > 0 ? platGames.map(g => `
+            <div class="cv-achievement">
+              <div class="cv-ach-icon" style="color:var(--plat)">✦</div>
+              <div class="cv-ach-content">
+                <div class="cv-ach-name">${escapeHtml(g.name)}</div>
+                <div class="cv-ach-desc">${g.done}/${g.total} conquistas • ${Math.round(g.playtime/60)}h jogadas</div>
+              </div>
+            </div>
+          `).join('') : '<div style="color:var(--txt3);font-size:12px;">Nenhum jogo platinado ainda.</div>'}
+        </div>
+      </div>
+    </div>
+    ${topRare.length > 0 ? `
+    <div class="cv-section">
+      <div class="cv-header">
+        <div class="cv-name">Conquistas Raras</div>
+        <div class="cv-stats-row">
+          <span>🔥 ${rareAchs.length} conquistas raras</span>
+        </div>
+      </div>
+      <div class="cv-body">
+        <div class="cv-column" style="flex: 2;">
+          ${topRare.map(a => `
+            <div class="cv-achievement">
+              <div class="cv-ach-icon">🏆</div>
+              <div class="cv-ach-content">
+                <div class="cv-ach-name">${escapeHtml(a.name)}</div>
+                <div class="cv-ach-desc">${escapeHtml(a.game)} • ${a.globalPct.toFixed(1)}% globais</div>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    </div>
+    ` : ''}
+    <div style="text-align:center;padding:20px;">
+      <button class="btn-modal" onclick="showSearchedGamesFromProfile()">🎮 Ver Todos os Jogos</button>
+    </div>
+  `;
+}
+
+function showSearchedGamesFromProfile() {
+  document.getElementById('search-profile-detail').classList.add('hide');
+  document.getElementById('search-result').classList.remove('hide');
+  document.getElementById('search-games-section').classList.remove('hide');
+  renderSearchGamesGrid();
+}
+
+function setSearchFilter(f, btn) {
+  searchCurrentFilter = f;
+  document.querySelectorAll('.search-games-filters .btn-filter').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderSearchGamesGrid();
+}
+
+function renderSearchGamesGrid() {
+  const grid = document.getElementById('search-games-grid');
+  let games = searchedGames.filter(g => g.hasAch || g.playtime > 0);
+
+  if (searchCurrentFilter === 'started')  games = games.filter(g => g.done > 0 && g.pct < 100);
+  if (searchCurrentFilter === 'platinum') games = games.filter(g => g.pct === 100 && g.total > 0);
+
+  if (games.length === 0) {
+    grid.innerHTML = '<div class="empty-state">Nenhum jogo com esse filtro</div>';
+    return;
+  }
+
+  grid.innerHTML = '';
+  games.forEach(g => {
+    const meta  = getGameMetadata(g.appid, g.name);
+    const isPl  = g.pct === 100 && g.total > 0;
+    const card  = document.createElement('div');
+    card.className = `game-card${isPl ? ' platinum' : ''}`;
+    card.onclick = () => openSearchedGameDetail(g.appid);
+    card.innerHTML = `
+      <div class="game-cover" id="srch-cover-${g.appid}" style="background:${meta.bg};">
+        <div class="game-cover-content">
+          <div class="game-cover-title">
+            <div class="game-cover-sub" style="color:${meta.dot}">Steam</div>
+            <div class="game-cover-name">${shortName(g.name)}</div>
+          </div>
+          ${isPl ? '<div class="plat-badge">✦</div>' : ''}
+        </div>
+      </div>
+      <div class="game-info">
+        ${g.total > 0
+          ? `<div class="game-stats-row">
+               <span class="game-ach-count">${g.done}/${g.total} troféus</span>
+               <span class="game-pct" style="color:${isPl ? 'var(--plat)' : g.done > 0 ? meta.dot : '#444'}">${g.pct}%</span>
+             </div>
+             <div class="pbar"><div class="pbar-fill" style="width:${g.pct}%;background:${isPl ? 'var(--plat)' : meta.accent};${isPl?'box-shadow:0 0 8px var(--plat)44':''}"></div></div>
+             ${g.playtime > 0 ? `<div class="game-playtime">⏱️ ${Math.round(g.playtime/60)}h jogadas</div>` : ''}
+             ${isPl ? '<div class="plat-label">PLATINADO ✦</div>' : ''}`
+          : `<div style="font-size:10px;color:#444;font-family:monospace;text-align:center;padding:4px 0">Sem conquistas</div>`
+        }
+      </div>`;
+    grid.appendChild(card);
+    loadCoverImage(g.appid, meta.bg, `srch-cover-${g.appid}`);
+  });
+}
+
+async function openSearchedGameDetail(appid) {
+  console.log('[openSearchedGameDetail] Abrindo jogo:', appid);
+  const g = searchedGames.find(g => g.appid === appid);
+  if (!g) {
+    console.error('[openSearchedGameDetail] Jogo não encontrado:', appid, 'searchedGames:', searchedGames.length);
+    return;
+  }
+  console.log('[openSearchedGameDetail] Jogo encontrado:', g.name);
+
+  searchCurrentGame = g;
+
+  // Esconde todas as views de pesquisa e mostra detalhe do jogo
+  document.getElementById('search-home-view').classList.add('hide');
+  document.getElementById('search-result').classList.add('hide');
+  document.getElementById('search-games-section').classList.add('hide');
+  document.getElementById('search-profile-detail').classList.add('hide');
+  document.getElementById('search-game-detail').classList.remove('hide');
+  console.log('[openSearchedGameDetail] View de conquistas deve estar visível');
+
+  // Banner
+  const meta = getGameMetadata(g.appid, g.name);
+  document.getElementById('search-detail-tag').textContent = 'SOMENTE LEITURA';
+  document.getElementById('search-detail-title').textContent = g.name;
+  document.getElementById('search-detail-stats').innerHTML =
+    `${Math.round(g.playtime/60)}h jogadas · ${g.total} conquistas`;
+  document.getElementById('search-detail-pct').textContent  = `${g.pct}%`;
+  document.getElementById('search-detail-achcount').textContent = `${g.done}/${g.total}`;
+  document.getElementById('search-detail-banner-bg').style.background = meta.bg;
+  loadBannerImageById('search-detail-banner-bg', g.appid);
+
+  // Carrega conquistas detalhadas
+  const list = document.getElementById('search-ach-list');
+  list.innerHTML = '<div style="text-align:center;padding:40px;color:var(--txt2)">Carregando conquistas...</div>';
+
+  console.log('[openSearchedGameDetail] Buscando conquistas para:', searchedPlayer.steamId, appid);
+
+  try {
+    const res  = await fetch(`/api/player/${searchedPlayer.steamId}/achievements/${appid}`);
+    const data = await res.json();
+    console.log('[openSearchedGameDetail] Resposta API:', res.status, data);
+    if (!res.ok) {
+      list.innerHTML = `<div class="empty-state">${data.error || 'Conquistas não disponíveis'}</div>`;
+      return;
+    }
+    searchCurrentGame.achievements = data.achievements;
+    console.log('[openSearchedGameDetail] Conquistas carregadas:', data.achievements?.length);
+    renderSearchAchievements();
+  } catch (e) {
+    console.error('[openSearchedGameDetail] Erro:', e);
+    list.innerHTML = '<div class="empty-state">Erro ao carregar conquistas.</div>';
+  }
+}
+
+function setSearchAchFilter(f, btn) {
+  searchCurrentAchFilter = f;
+  document.querySelectorAll('#search-game-detail .btn-ach-filter').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderSearchAchievements();
+}
+
+function renderSearchAchievements() {
+  const achs = searchCurrentGame?.achievements || [];
+  let list = achs;
+  if (searchCurrentAchFilter === 'unlocked') list = achs.filter(a => a.unlocked);
+  if (searchCurrentAchFilter === 'locked')   list = achs.filter(a => !a.unlocked);
+
+  const el = document.getElementById('search-ach-list');
+  if (list.length === 0) { el.innerHTML = '<div class="empty-state">NENHUMA CONQUISTA COM ESSE FILTRO</div>'; return; }
+
+  el.innerHTML = list.map(a => {
+    const type = classifyTrophy(a.globalPct, a.name, a.desc);
+    const meta = TROPHY_META[type];
+    const iconUrl = a.unlocked && a.icon ? a.icon : (a.iconGray || a.icon);
+    const unlockDate = a.unlockTime > 0 ? new Date(a.unlockTime * 1000).toLocaleDateString('pt-BR') : '';
+
+    return `
+      <div class="ach-item ${a.unlocked ? 'unlocked' : 'locked'}" style="${a.unlocked ? `border-color:${meta.color}33;` : ''}">
+        <div class="ach-checkbox ${a.unlocked ? 'checked' : ''}" style="${a.unlocked ? `background:${meta.color};border-color:${meta.color};box-shadow:0 0 8px ${meta.color}44` : ''}">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <polyline points="2,7 5.5,11 12,3" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div class="ach-icon-wrap">
+          ${iconUrl ? `<img src="${iconUrl}" alt="" onerror="this.parentNode.innerHTML='<span class=ach-icon-placeholder>${meta.icon}</span>'">` : `<span class="ach-icon-placeholder">${meta.icon}</span>`}
+        </div>
+        <div class="ach-body">
+          <div class="ach-name" style="color:${a.unlocked ? meta.color : 'var(--txt)'}">${escapeHtml(a.name)}</div>
+          <div class="ach-desc">${escapeHtml(a.desc || '')}</div>
+          ${unlockDate ? `<div class="ach-unlock-time">✓ Desbloqueado em ${unlockDate}</div>` : ''}
+        </div>
+        <div class="ach-meta">
+          <div class="trophy-badge" style="color:${meta.color};background:${meta.bg};border-color:${meta.color}33">
+            ${meta.icon} ${meta.label}
+          </div>
+          ${a.globalPct !== undefined ? `<div class="ach-pct">${a.globalPct.toFixed(1)}% globais</div>` : ''}
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function backToSearchResult() {
+  document.getElementById('search-game-detail').classList.add('hide');
+  document.getElementById('search-profile-detail').classList.add('hide');
+  document.getElementById('search-games-section').classList.add('hide');
+  document.getElementById('search-home-view').classList.remove('hide');
+}
+
+function backToSearchedProfile() {
+  document.getElementById('search-game-detail').classList.add('hide');
+  document.getElementById('search-profile-detail').classList.remove('hide');
+}
+
+// ══════════════════════════════════════════════════════════
+//  COMPARAÇÃO DE CONQUISTAS
+// ══════════════════════════════════════════════════════════
+
+let compareData      = null; // resultado da API /compare
+let compareFilter    = 'all';
+let compareGameAppid = null;
+
+async function openCompareView() {
+  if (!searchCurrentGame || !searchedPlayer) return;
+
+  compareGameAppid = searchCurrentGame.appid;
+  const btn = document.getElementById('btn-compare');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Carregando...'; }
+
+  try {
+    const res  = await fetch(`/api/compare/${searchedPlayer.steamId}/${compareGameAppid}`);
+    const data = await res.json();
+    if (!res.ok) {
+      alert(data.error || 'Não foi possível carregar a comparação.');
+      return;
+    }
+    compareData   = data;
+    compareFilter = 'all';
+
+    // Muda para a view de comparação
+    document.getElementById('search-game-detail').classList.add('hide');
+    document.getElementById('search-compare-view').classList.remove('hide');
+    renderCompareView();
+  } catch (e) {
+    alert('Erro de conexão ao carregar comparação.');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '⚔️ Comparar Comigo'; }
+  }
+}
+
+function backFromCompare() {
+  document.getElementById('search-compare-view').classList.add('hide');
+  document.getElementById('search-game-detail').classList.remove('hide');
+}
+
+function setCompareFilter(f, btn) {
+  compareFilter = f;
+  document.querySelectorAll('.compare-filters .btn-filter').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderCompareList();
+}
+
+function renderCompareView() {
+  if (!compareData) return;
+
+  const gameName    = searchCurrentGame?.name || 'Jogo';
+  const myName      = state.userInfo.personaname || 'Você';
+  const myAvatar    = state.userInfo.avatar || '';
+  const theirName   = searchedPlayer.personaname || 'Jogador';
+  const theirAvatar = searchedPlayer.avatar || '';
+
+  // Título
+  document.getElementById('compare-title').textContent = `⚔️ ${gameName}`;
+
+  // Cards dos jogadores
+  document.getElementById('compare-header-cards').innerHTML = `
+    <div class="compare-player-card me">
+      ${myAvatar
+        ? `<img class="compare-player-avatar" src="${myAvatar}" alt="${escapeHtml(myName)}">`
+        : `<div class="compare-player-avatar-ph">🎮</div>`}
+      <div class="compare-player-info">
+        <div class="compare-player-name">${escapeHtml(myName)}</div>
+        <div class="compare-player-pct" style="color:#3a7acc">${compareData.me.pct}%</div>
+        <div class="compare-player-sub">${compareData.me.done}/${compareData.total} conquistas</div>
+      </div>
+    </div>
+    <div class="compare-vs">VS</div>
+    <div class="compare-player-card them">
+      ${theirAvatar
+        ? `<img class="compare-player-avatar" src="${theirAvatar}" alt="${escapeHtml(theirName)}">`
+        : `<div class="compare-player-avatar-ph">🎮</div>`}
+      <div class="compare-player-info">
+        <div class="compare-player-name">${escapeHtml(theirName)}</div>
+        <div class="compare-player-pct" style="color:#7c3aed">${compareData.them.pct}%</div>
+        <div class="compare-player-sub">${compareData.them.done}/${compareData.total} conquistas</div>
+      </div>
+    </div>
+  `;
+
+  // Barras de progresso
+  const pbarHtml = `
+    <div class="compare-pbar-wrap">
+      <div class="compare-pbar-side">
+        <div class="compare-pbar-label" style="color:#3a7acc">${escapeHtml(myName)}</div>
+        <div class="compare-pbar-track">
+          <div class="compare-pbar-fill-me" style="width:${compareData.me.pct}%"></div>
+        </div>
+      </div>
+      <div class="compare-pbar-center">vs</div>
+      <div class="compare-pbar-side">
+        <div class="compare-pbar-label" style="color:#7c3aed;text-align:right">${escapeHtml(theirName)}</div>
+        <div class="compare-pbar-track">
+          <div class="compare-pbar-fill-them" style="width:${compareData.them.pct}%"></div>
+        </div>
+      </div>
+    </div>`;
+  document.getElementById('compare-header-cards').insertAdjacentHTML('afterend', pbarHtml);
+
+  renderCompareList();
+}
+
+function renderCompareList() {
+  if (!compareData) return;
+
+  const myName    = state.userInfo.personaname || 'Você';
+  const theirName = searchedPlayer?.personaname || 'Jogador';
+
+  let achs = compareData.achievements;
+  if (compareFilter === 'only_me')   achs = achs.filter(a =>  a.myUnlocked && !a.theirUnlocked);
+  if (compareFilter === 'only_them') achs = achs.filter(a => !a.myUnlocked &&  a.theirUnlocked);
+  if (compareFilter === 'both')      achs = achs.filter(a =>  a.myUnlocked &&  a.theirUnlocked);
+  if (compareFilter === 'neither')   achs = achs.filter(a => !a.myUnlocked && !a.theirUnlocked);
+
+  const el = document.getElementById('compare-list');
+  if (achs.length === 0) {
+    el.innerHTML = '<div class="empty-state">Nenhuma conquista com esse filtro</div>';
+    return;
+  }
+
+  // Ordena: ambos > só eu > só ele > nenhum
+  achs = [...achs].sort((a, b) => {
+    const score = x => (x.myUnlocked ? 2 : 0) + (x.theirUnlocked ? 1 : 0);
+    return score(b) - score(a);
+  });
+
+  const type = a => classifyTrophy(a.globalPct, a.name, a.desc);
+
+  el.innerHTML = achs.map(a => {
+    const both    =  a.myUnlocked &&  a.theirUnlocked;
+    const onlyMe  =  a.myUnlocked && !a.theirUnlocked;
+    const onlyThem= !a.myUnlocked &&  a.theirUnlocked;
+    const cls     = both ? 'both' : onlyMe ? 'only-me' : onlyThem ? 'only-them' : '';
+    const tm      = TROPHY_META[type(a)];
+    const iconSrc = (a.myUnlocked || a.theirUnlocked) ? a.icon : (a.iconGray || a.icon);
+
+    return `
+      <div class="compare-item ${cls}">
+        <!-- Meu status (esquerda) -->
+        <div class="compare-check ${a.myUnlocked ? 'me-yes' : ''}" title="${escapeHtml(myName)}">
+          ${a.myUnlocked ? '✓' : ''}
+        </div>
+
+        <!-- Centro: ícone + nome -->
+        <div class="compare-item-center">
+          ${iconSrc
+            ? `<img class="compare-item-icon" src="${iconSrc}" alt="" loading="lazy" onerror="this.style.display='none'">`
+            : `<div class="compare-item-icon-ph">${tm.icon}</div>`}
+          <div class="compare-item-text">
+            <div class="compare-item-name" style="color:${both ? '#22cc66' : onlyMe ? '#3a7acc' : onlyThem ? '#a78bfa' : 'var(--txt)'}">
+              ${escapeHtml(a.name)}
+            </div>
+            <div class="compare-item-desc">${escapeHtml(a.desc || '')}</div>
+            ${a.globalPct !== undefined
+              ? `<div class="compare-item-pct">${tm.icon} ${tm.label} · ${a.globalPct.toFixed(1)}% globais</div>`
+              : `<div class="compare-item-pct">${tm.icon} ${tm.label}</div>`}
+          </div>
+        </div>
+
+        <!-- Status deles (direita) -->
+        <div class="compare-check ${a.theirUnlocked ? 'them-yes' : ''}" title="${escapeHtml(theirName)}">
+          ${a.theirUnlocked ? '✓' : ''}
+        </div>
+      </div>`;
+  }).join('');
+}
+
+// Versão auxiliar de loadCoverImage que aceita id customizado
+function loadCoverImage(appid, fallbackBg, coverId) {
+  coverId = coverId || `cover-${appid}`;
+  const coverEl = document.getElementById(coverId);
+  if (!coverEl) return;
+  const urls = [
+    `https://steamcdn-a.akamaihd.net/steam/apps/${appid}/library_600x900.jpg`,
+    `https://cdn.akamai.steamstatic.com/steam/apps/${appid}/library_600x900.jpg`,
+    `https://steamcdn-a.akamaihd.net/steam/apps/${appid}/header.jpg`,
+    `https://cdn.akamai.steamstatic.com/steam/apps/${appid}/header.jpg`,
+    `https://steamcdn-a.akamaihd.net/steam/apps/${appid}/capsule_231x87.jpg`,
+  ];
+  let i = 0;
+  function tryNext() {
+    if (i >= urls.length) return;
+    const img = new Image();
+    img.onload = () => {
+      coverEl.style.setProperty('background-image', `url('${urls[i]}')`, 'important');
+      coverEl.style.backgroundSize = 'cover';
+      coverEl.style.backgroundPosition = 'center';
+    };
+    img.onerror = () => { i++; tryNext(); };
+    img.src = urls[i];
+  }
+  setTimeout(tryNext, 10);
+}
+
+function loadBannerImageById(elId, appid) {
+  const bgEl = document.getElementById(elId);
+  if (!bgEl) return;
+  const urls = [
+    `https://cdn.akamai.steamstatic.com/steam/apps/${appid}/header.jpg`,
+    `https://steamcdn-a.akamaihd.net/steam/apps/${appid}/header.jpg`,
+    `https://cdn.akamai.steamstatic.com/steam/apps/${appid}/library_hero.jpg`,
+  ];
+  let i = 0;
+  function tryNext() {
+    if (i >= urls.length) return;
+    const img = new Image();
+    img.onload = () => { bgEl.style.setProperty('background-image', `url('${urls[i]}')`, 'important'); bgEl.style.backgroundSize = 'cover'; bgEl.style.backgroundPosition = 'center'; };
+    img.onerror = () => { i++; tryNext(); };
+    img.src = urls[i];
+  }
+  setTimeout(tryNext, 10);
+}
+
+// ══════════════════════════════════════════════════════════
+//  INIT
 
 // Backwards compat
 if (!state.profile) state.profile = { xp: 0, equippedTitle: 'novice', featuredGames: [], stats: {} };
@@ -1821,12 +2605,18 @@ if (!state.userInfo) state.userInfo = { personaname: '', avatar: '', profileurl:
       };
       save();
 
-      if (state.games.length > 0) {
+      // Tenta carregar do cache de sessão primeiro (evita recarregar no F5)
+      const hasSessionCache = loadSessionCache();
+      
+      if (hasSessionCache && state.games.length > 0) {
+        // Tem cache válido na sessão, usa ele
         show('screen-dash');
         renderDash();
       } else if (state.trackedAppIds.size > 0) {
+        // Não tem cache mas tem jogos rastreados, precisa buscar
         fetchTrackedGames();
       } else {
+        // Primeira vez, busca tudo
         show('screen-loading');
         doFetch();
       }

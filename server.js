@@ -128,14 +128,11 @@ app.get('/api/me', (req, res) => {
 });
 
 // ── Proxy para a API da Steam ──────────────────────────────
-// O frontend envia a URL da Steam sem a API Key.
-// O servidor adiciona a chave e repassa a requisição.
 app.get('/api/steam', requireAuth, async (req, res) => {
   const { url } = req.query;
   if (!url) return res.status(400).json({ error: 'Parâmetro url obrigatório' });
 
   try {
-    // Reconstrói a URL adicionando a API Key do servidor
     const targetUrl = new URL(decodeURIComponent(url));
     targetUrl.searchParams.set('key', process.env.STEAM_API_KEY);
 
@@ -144,15 +141,234 @@ app.get('/api/steam', requireAuth, async (req, res) => {
       timeout: 15000,
     });
 
+    // Para endpoints de conquistas, 400/403 significa "jogo sem conquistas ou perfil privado"
+    // Retornamos 200 com estrutura vazia para não poluir o console do cliente
     if (!response.ok) {
+      const path = targetUrl.pathname;
+      if (path.includes('GetPlayerAchievements') || path.includes('GetSchemaForGame')) {
+        return res.json({ playerstats: { achievements: [] }, game: { availableGameStats: { achievements: [] } } });
+      }
       return res.status(response.status).json({ error: `Steam API retornou ${response.status}` });
     }
 
-    const data = await response.json();
-    res.json(data);
+    res.json(await response.json());
   } catch (err) {
-    console.error('Erro no proxy Steam:', err.message);
+    console.error('[API/Steam] Erro:', err.message);
     res.status(500).json({ error: err.message });
+  }
+});
+
+// ══════════════════════════════════════════════════════════
+//  ROTAS DE BUSCA DE JOGADORES
+// ══════════════════════════════════════════════════════════
+
+// Helper: faz chamada à Steam API com a chave do servidor
+async function steamAPI(url) {
+  const u = new URL(url);
+  u.searchParams.set('key', process.env.STEAM_API_KEY);
+  const res = await fetch(u.toString(), { headers: { Accept: 'application/json' }, timeout: 12000 });
+  if (!res.ok) throw new Error(`Steam API ${res.status}`);
+  return res.json();
+}
+
+// GET /api/player/search?query=...
+// Recebe um SteamID64 ou vanity URL e devolve o perfil público do jogador.
+app.get('/api/player/search', requireAuth, async (req, res) => {
+  const { query } = req.query;
+  if (!query) return res.status(400).json({ error: 'Parâmetro query obrigatório' });
+
+  try {
+    let steamId = query.trim();
+
+    // Se não for um SteamID64 numérico, tenta resolver como vanity URL
+    if (!/^\d{17}$/.test(steamId)) {
+      // Remove prefixos comuns que o usuário pode colar
+      steamId = steamId
+        .replace(/https?:\/\/steamcommunity\.com\/id\//i, '')
+        .replace(/https?:\/\/steamcommunity\.com\/profiles\//i, '')
+        .replace(/\/$/, '')
+        .trim();
+
+      // Se ainda não for numérico, resolve como vanity URL
+      if (!/^\d{17}$/.test(steamId)) {
+        const vanity = await steamAPI(
+          `https://api.steampowered.com/ISteamUser/ResolveVanityURL/v0001/?vanityurl=${encodeURIComponent(steamId)}`
+        );
+        if (vanity?.response?.success !== 1) {
+          return res.status(404).json({ error: 'Jogador não encontrado. Tente com o SteamID64 (17 dígitos).' });
+        }
+        steamId = vanity.response.steamid;
+      }
+    }
+
+    // Busca o perfil público
+    const summary = await steamAPI(
+      `https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/?steamids=${steamId}`
+    );
+    const player = summary?.response?.players?.[0];
+    if (!player) return res.status(404).json({ error: 'Perfil não encontrado.' });
+
+    const result = {
+      steamId      : player.steamid,
+      personaname  : player.personaname  || '',
+      avatar       : player.avatarfull   || player.avatar || '',
+      profileurl   : player.profileurl   || '',
+      realname     : player.realname     || '',
+      loccountrycode: player.loccountrycode || '',
+      communityvisibilitystate: player.communityvisibilitystate, // 3 = público
+    };
+
+    res.json(result);
+  } catch (err) {
+    console.error('Erro ao buscar jogador:', err.message);
+    res.status(500).json({ error: 'Erro ao buscar jogador na Steam.' });
+  }
+});
+
+// GET /api/player/:steamid/games
+// Retorna os jogos públicos com contagem de conquistas de outro jogador.
+// Só funciona se o perfil do jogador for público.
+app.get('/api/player/:steamid/games', requireAuth, async (req, res) => {
+  const { steamid } = req.params;
+  if (!/^\d{17}$/.test(steamid)) return res.status(400).json({ error: 'SteamID inválido' });
+
+  try {
+    const owned = await steamAPI(
+      `https://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/?steamid=${steamid}&include_appinfo=true&include_played_free_games=true`
+    );
+
+    if (!owned?.response?.games) {
+      return res.status(403).json({ error: 'Perfil privado ou sem jogos públicos.' });
+    }
+
+    const games = owned.response.games
+      .filter(g => g.name)
+      .map(g => ({
+        appid   : g.appid,
+        name    : g.name,
+        playtime: g.playtime_forever || 0,
+      }))
+      .sort((a, b) => b.playtime - a.playtime);
+
+    res.json({ games });
+  } catch (err) {
+    console.error('Erro ao buscar jogos:', err.message);
+    res.status(500).json({ error: 'Erro ao buscar jogos na Steam.' });
+  }
+});
+
+// GET /api/player/:steamid/achievements/:appid
+// Retorna as conquistas de um jogo específico de outro jogador.
+app.get('/api/player/:steamid/achievements/:appid', requireAuth, async (req, res) => {
+  const { steamid, appid } = req.params;
+  console.log('[API/Achievements] Buscando conquistas:', steamid, appid);
+
+  if (!/^\d{17}$/.test(steamid)) return res.status(400).json({ error: 'SteamID inválido' });
+
+  try {
+    const [schema, player, global_] = await Promise.all([
+      steamAPI(`https://api.steampowered.com/ISteamUserStats/GetSchemaForGame/v0002/?appid=${appid}&l=portuguese`),
+      steamAPI(`https://api.steampowered.com/ISteamUserStats/GetPlayerAchievements/v0001/?appid=${appid}&steamid=${steamid}&l=portuguese`),
+      steamAPI(`https://api.steampowered.com/ISteamUserStats/GetGlobalAchievementPercentagesForApp/v0002/?gameid=${appid}`),
+    ]);
+
+    const schemaAchs  = schema?.game?.availableGameStats?.achievements || [];
+    const playerAchs  = player?.playerstats?.achievements || [];
+    const globalList  = global_?.achievementpercentages?.achievements || [];
+
+    console.log('[API/Achievements] Schema:', schemaAchs.length, '| Player:', playerAchs.length, '| Global:', globalList.length);
+
+    const playerMap = {};
+    playerAchs.forEach(a => { playerMap[a.apiname] = a; });
+
+    const globalMap = {};
+    globalList.forEach(a => { globalMap[a.name] = parseFloat(a.percent); });
+
+    const achievements = schemaAchs.map(sa => {
+      const pa = playerMap[sa.name] || {};
+      const globalPct = globalMap[sa.name] ?? undefined;
+      return {
+        id        : sa.name,
+        name      : sa.displayName || sa.name,
+        desc      : sa.description || '',
+        icon      : sa.icon     || '',
+        iconGray  : sa.icongray || '',
+        unlocked  : pa.achieved === 1,
+        unlockTime: pa.unlocktime || 0,
+        globalPct,
+      };
+    });
+
+    const done  = achievements.filter(a => a.unlocked).length;
+    const total = achievements.length;
+    const pct   = total ? Math.round((done / total) * 100) : 0;
+
+    console.log('[API/Achievements] Total conquistas:', total, '| Desbloqueadas:', done);
+    res.json({ achievements, done, total, pct });
+  } catch (err) {
+    console.error('[API/Achievements] Erro:', err.message);
+    // Conquistas privadas ou jogo sem conquistas
+    res.status(403).json({ error: 'Conquistas não disponíveis para este perfil/jogo.' });
+  }
+});
+
+// GET /api/compare/:targetSteamId/:appid
+// Busca conquistas do usuário logado E do jogador alvo para o mesmo jogo,
+// retornando tudo em uma única chamada para o cliente montar a comparação.
+app.get('/api/compare/:targetSteamId/:appid', requireAuth, async (req, res) => {
+  const { targetSteamId, appid } = req.params;
+  const mySteamId = req.user.steamId;
+
+  if (!/^\d{17}$/.test(targetSteamId)) return res.status(400).json({ error: 'SteamID inválido' });
+
+  try {
+    // Busca schema, conquistas de ambos os jogadores e percentuais globais em paralelo
+    const [schema, myAchs, theirAchs, globalData] = await Promise.all([
+      steamAPI(`https://api.steampowered.com/ISteamUserStats/GetSchemaForGame/v0002/?appid=${appid}&l=portuguese`),
+      steamAPI(`https://api.steampowered.com/ISteamUserStats/GetPlayerAchievements/v0001/?appid=${appid}&steamid=${mySteamId}&l=portuguese`)
+        .catch(() => ({ playerstats: { achievements: [] } })),
+      steamAPI(`https://api.steampowered.com/ISteamUserStats/GetPlayerAchievements/v0001/?appid=${appid}&steamid=${targetSteamId}&l=portuguese`)
+        .catch(() => ({ playerstats: { achievements: [] } })),
+      steamAPI(`https://api.steampowered.com/ISteamUserStats/GetGlobalAchievementPercentagesForApp/v0002/?gameid=${appid}`)
+        .catch(() => ({ achievementpercentages: { achievements: [] } })),
+    ]);
+
+    const schemaAchs = schema?.game?.availableGameStats?.achievements || [];
+    const myMap     = {};
+    const theirMap  = {};
+    const globalMap = {};
+
+    (myAchs?.playerstats?.achievements    || []).forEach(a => { myMap[a.apiname]    = a; });
+    (theirAchs?.playerstats?.achievements || []).forEach(a => { theirMap[a.apiname] = a; });
+    (globalData?.achievementpercentages?.achievements || []).forEach(a => { globalMap[a.name] = parseFloat(a.percent); });
+
+    const achievements = schemaAchs.map(sa => ({
+      id        : sa.name,
+      name      : sa.displayName || sa.name,
+      desc      : sa.description || '',
+      icon      : sa.icon     || '',
+      iconGray  : sa.icongray || '',
+      globalPct : globalMap[sa.name] ?? undefined,
+      // Status de cada jogador
+      myUnlocked    : (myMap[sa.name]?.achieved    === 1),
+      myUnlockTime  : myMap[sa.name]?.unlocktime    || 0,
+      theirUnlocked : (theirMap[sa.name]?.achieved  === 1),
+      theirUnlockTime: theirMap[sa.name]?.unlocktime || 0,
+    }));
+
+    const myDone    = achievements.filter(a => a.myUnlocked).length;
+    const theirDone = achievements.filter(a => a.theirUnlocked).length;
+    const total     = achievements.length;
+
+    res.json({
+      achievements,
+      total,
+      me    : { done: myDone,    pct: total ? Math.round((myDone    / total) * 100) : 0 },
+      them  : { done: theirDone, pct: total ? Math.round((theirDone / total) * 100) : 0 },
+    });
+  } catch (err) {
+    console.error('[API/Compare] Erro:', err.message);
+    res.status(500).json({ error: 'Erro ao buscar dados para comparação.' });
   }
 });
 
