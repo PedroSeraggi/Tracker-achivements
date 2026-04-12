@@ -8,6 +8,296 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
+<style>
+/* ── Botão oficial "Login with Steam" ── */
+.btn-steam-login {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  width: 100%;
+  padding: 16px 24px;
+  background: linear-gradient(180deg, #4c6b22 0%, #3a5016 100%);
+  border: 1px solid #6b8c2a;
+  border-radius: 10px;
+  color: #c6d4df;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all .2s;
+  font-family: inherit;
+  margin-top: 8px;
+}
+.btn-steam-login:hover {
+  background: linear-gradient(180deg, #5a7e28 0%, #48621c 100%);
+  border-color: #8aab35;
+  color: #fff;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px #3a501620;
+}
+.btn-steam-login svg {
+  flex-shrink: 0;
+}
+.login-divider {
+  text-align: center;
+  color: var(--txt3);
+  font-size: 11px;
+  letter-spacing: 2px;
+  margin: 24px 0;
+  position: relative;
+}
+.login-divider::before,
+.login-divider::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  width: 38%;
+  height: 1px;
+  background: var(--b2);
+}
+.login-divider::before { left: 0; }
+.login-divider::after  { right: 0; }
+.login-features {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 24px;
+}
+.login-feature {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--txt2);
+  font-size: 13px;
+}
+.login-feature-icon {
+  font-size: 18px;
+  width: 28px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+/* ── Search View ── */
+.search-hero {
+  text-align: center;
+  padding: 48px 20px 32px;
+  max-width: 680px;
+  margin: 0 auto;
+}
+.search-hero-icon { font-size: 48px; margin-bottom: 16px; }
+.search-hero-title { font-size: 22px; font-weight: 700; color: #fff; margin-bottom: 8px; }
+.search-hero-sub   { font-size: 13px; color: var(--txt2); margin-bottom: 28px; }
+.search-bar-wrap {
+  display: flex;
+  gap: 10px;
+  max-width: 580px;
+  margin: 0 auto;
+}
+.search-player-input {
+  flex: 1;
+  background: var(--bg3);
+  border: 1px solid var(--b2);
+  border-radius: 8px;
+  padding: 12px 16px;
+  color: var(--txt);
+  font-size: 14px;
+  outline: none;
+  transition: border-color .2s;
+}
+.search-player-input:focus { border-color: var(--accent); }
+.btn-search-player {
+  background: var(--accent);
+  border: none;
+  border-radius: 8px;
+  padding: 12px 22px;
+  color: #fff;
+  font-weight: 700;
+  font-size: 14px;
+  white-space: nowrap;
+  transition: opacity .2s;
+}
+.btn-search-player:hover { opacity: .85; }
+.btn-search-player:disabled { opacity: .4; cursor: not-allowed; }
+.search-bar-wrap {
+  position: relative;
+}
+.search-error {
+  margin-top: 14px;
+  color: #f87171;
+  font-size: 13px;
+  background: #200a0a;
+  border: 1px solid #5a1a1a;
+  border-radius: 8px;
+  padding: 10px 16px;
+}
+
+/* Card do jogador encontrado */
+.found-player-card {
+  max-width: 680px;
+  margin: 0 auto 32px;
+  background: var(--bg2);
+  border: 1px solid var(--b2);
+  border-radius: 14px;
+  padding: 24px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+.found-avatar {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: var(--bg3);
+  object-fit: cover;
+  flex-shrink: 0;
+  border: 2px solid var(--b3);
+}
+.found-avatar-placeholder {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: var(--bg3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32px;
+  flex-shrink: 0;
+}
+.found-info { flex: 1; min-width: 0; }
+.found-name { font-size: 20px; font-weight: 700; color: #fff; }
+.found-realname { font-size: 13px; color: var(--txt2); margin-top: 2px; }
+.found-steamid  { font-size: 11px; color: var(--txt3); font-family: monospace; margin-top: 6px; }
+.found-links    { display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
+.found-link {
+  font-size: 12px;
+  color: var(--accent);
+  text-decoration: none;
+  border: 1px solid var(--accent)44;
+  border-radius: 6px;
+  padding: 4px 10px;
+  transition: background .2s;
+}
+.found-link:hover { background: var(--accent)22; }
+.found-private-badge {
+  font-size: 11px;
+  color: #f87171;
+  background: #200a0a;
+  border: 1px solid #5a1a1a;
+  border-radius: 6px;
+  padding: 4px 10px;
+}
+.btn-load-games {
+  background: var(--accent);
+  border: none;
+  border-radius: 8px;
+  padding: 10px 20px;
+  color: #fff;
+  font-weight: 700;
+  font-size: 13px;
+  transition: opacity .2s;
+  white-space: nowrap;
+}
+.btn-load-games:hover    { opacity: .85; }
+.btn-load-games:disabled { opacity: .4; cursor: not-allowed; }
+
+/* Seção de jogos do jogador pesquisado */
+.search-games-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 20px 16px;
+  flex-wrap: wrap;
+}
+.search-games-title { font-size: 14px; font-weight: 600; color: var(--txt2); letter-spacing: 1px; }
+.search-games-filters { display: flex; gap: 8px; }
+.readonly-badge {
+  display: inline-block;
+  font-size: 10px;
+  color: var(--txt3);
+  background: var(--bg3);
+  border: 1px solid var(--b2);
+  border-radius: 4px;
+  padding: 2px 8px;
+  letter-spacing: 1px;
+  margin-left: 8px;
+}
+
+/* ── Compare Button ── */
+.btn-compare {
+  background: linear-gradient(135deg, #3a7acc, #7c3aed);
+  border: none;
+  border-radius: 8px;
+  padding: 9px 18px;
+  color: #fff;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  transition: opacity .2s, transform .1s;
+  white-space: nowrap;
+}
+.btn-compare:hover    { opacity: .85; transform: translateY(-1px); }
+.btn-compare:disabled { opacity: .4; cursor: not-allowed; transform: none; }
+
+/* ── Compare View ── */
+.compare-topbar { display:flex; align-items:center; gap:16px; padding:16px 20px 8px; flex-wrap:wrap; }
+.compare-title  { font-size:16px; font-weight:700; color:#fff; }
+.compare-header-cards { display:flex; gap:16px; padding:16px 20px; flex-wrap:wrap; align-items:center; }
+.compare-player-card {
+  flex:1; min-width:200px;
+  background:var(--bg2); border:1px solid var(--b2); border-radius:12px;
+  padding:16px 18px; display:flex; align-items:center; gap:14px;
+}
+.compare-player-card.me   { border-color:#3a7acc55; }
+.compare-player-card.them { border-color:#7c3aed55; }
+.compare-player-avatar    { width:48px; height:48px; border-radius:50%; object-fit:cover; flex-shrink:0; }
+.compare-player-avatar-ph {
+  width:48px; height:48px; border-radius:50%; background:var(--bg3);
+  display:flex; align-items:center; justify-content:center; font-size:22px; flex-shrink:0;
+}
+.compare-player-info { flex:1; min-width:0; }
+.compare-player-name { font-weight:700; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.compare-player-pct  { font-size:28px; font-weight:900; line-height:1.1; }
+.compare-player-sub  { font-size:12px; color:var(--txt2); }
+.compare-vs { font-size:20px; font-weight:900; color:var(--txt3); padding:0 4px; }
+.compare-pbar-wrap  { display:flex; gap:12px; padding:0 20px 16px; align-items:center; }
+.compare-pbar-side  { flex:1; }
+.compare-pbar-label { font-size:11px; color:var(--txt2); margin-bottom:4px; }
+.compare-pbar-track { height:6px; background:var(--b2); border-radius:99px; overflow:hidden; }
+.compare-pbar-fill-me   { height:100%; background:#3a7acc; border-radius:99px; transition:width .4s; }
+.compare-pbar-fill-them { height:100%; background:#7c3aed; border-radius:99px; transition:width .4s; }
+.compare-pbar-center    { font-size:11px; color:var(--txt3); text-align:center; width:20px; flex-shrink:0; }
+.compare-filters { display:flex; gap:8px; padding:0 20px 16px; flex-wrap:wrap; }
+.compare-list    { padding:0 20px 40px; display:flex; flex-direction:column; gap:6px; }
+.compare-item {
+  display:grid; grid-template-columns:40px 1fr 40px;
+  align-items:center; gap:10px;
+  background:var(--bg2); border:1px solid var(--b2);
+  border-radius:10px; padding:10px 14px;
+}
+.compare-item.both      { border-color:#22cc6633; background:#22cc660a; }
+.compare-item.only-me   { border-color:#3a7acc44; }
+.compare-item.only-them { border-color:#7c3aed44; }
+.compare-item-center { display:flex; align-items:center; gap:10px; min-width:0; }
+.compare-item-icon   { width:36px; height:36px; border-radius:6px; flex-shrink:0; object-fit:cover; }
+.compare-item-icon-ph {
+  width:36px; height:36px; border-radius:6px; background:var(--bg3);
+  display:flex; align-items:center; justify-content:center; font-size:16px; flex-shrink:0;
+}
+.compare-item-text { min-width:0; }
+.compare-item-name { font-size:13px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.compare-item-desc { font-size:11px; color:var(--txt2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.compare-item-pct  { font-size:10px; color:var(--txt3); margin-top:2px; }
+.compare-check {
+  width:36px; height:36px; border-radius:8px;
+  display:flex; align-items:center; justify-content:center;
+  font-size:16px; border:2px solid var(--b2); background:var(--bg3); flex-shrink:0;
+}
+.compare-check.me-yes   { background:#3a7acc22; border-color:#3a7acc; }
+.compare-check.them-yes { background:#7c3aed22; border-color:#7c3aed; }
+</style>
 </head>
 <body>
 
@@ -23,29 +313,41 @@
         <text x="50" y="88" text-anchor="middle" fill="#3a7acc" font-size="10" font-family="monospace" font-weight="bold">100%</text>
       </svg>
       <h1>Steam<br><span>Trophy Tracker</span></h1>
-      <p>Steam API Integration · Rumo à Platina</p>
+      <p>Conquistas · Guias · Perfil Gamer</p>
     </div>
 
-    <div class="form-group" id="key-input-group">
-      <label>Steam API Key</label>
-      <input type="password" id="inp-key" placeholder="Sua chave da API Steam" autocomplete="off" spellcheck="false" />
-      <div class="hint">
-        Obtenha grátis em: <a href="https://steamcommunity.com/dev/apikey" target="_blank">steamcommunity.com/dev/apikey</a>
+    <div class="login-features">
+      <div class="login-feature">
+        <span class="login-feature-icon">🏆</span>
+        <span>Acompanhe conquistas de todos os seus jogos</span>
+      </div>
+      <div class="login-feature">
+        <span class="login-feature-icon">💎</span>
+        <span>Sistema de troféus Bronze, Prata, Ouro e Platina</span>
+      </div>
+      <div class="login-feature">
+        <span class="login-feature-icon">📖</span>
+        <span>Crie e leia guias para desbloquear conquistas difíceis</span>
+      </div>
+      <div class="login-feature">
+        <span class="login-feature-icon">👤</span>
+        <span>Perfil gamer com XP, títulos e jogos em destaque</span>
       </div>
     </div>
 
-    <div class="form-group">
-      <label>Steam ID</label>
-      <input type="text" id="inp-steamid" placeholder="ex: 76561198012345678" autocomplete="off" spellcheck="false" />
-      <div class="hint">
-        Encontre em: <a href="https://steamid.io" target="_blank">steamid.io</a> — use o formato SteamID64
-      </div>
-    </div>
+    <div class="login-divider">ENTRAR COM</div>
 
-    <button class="btn-login" onclick="startFetch()">🏆 CONECTAR À STEAM</button>
+    <a class="btn-steam-login" href="/auth/steam">
+      <!-- Logo oficial da Steam -->
+      <svg width="28" height="28" viewBox="0 0 233 233" xmlns="http://www.w3.org/2000/svg">
+        <path fill="#c6d4df" d="M116.5 0C52.2 0 0 52.2 0 116.5c0 55.2 38.5 101.6 90.4 113.3l30.5-74.4c-3-.8-5.8-2-8.4-3.6l-34.1 13.9C70.2 155.7 64 144.7 64 132.3c0-29 23.6-52.5 52.5-52.5 7.3 0 14.2 1.5 20.5 4.2l14.2-34.7C139.5 44.1 128.4 41 116.5 41c-41.7 0-75.5 33.8-75.5 75.5S74.8 192 116.5 192s75.5-33.8 75.5-75.5c0-5.2-.5-10.2-1.5-15.1l36.6-14.9C228.3 98.1 233 107 233 116.5 233 180.8 180.8 233 116.5 233S0 180.8 0 116.5 52.2 0 116.5 0z"/>
+        <circle fill="#c6d4df" cx="116.5" cy="132.3" r="26.5"/>
+      </svg>
+      Entrar com a Steam
+    </a>
 
-    <div class="login-warn" style="background:#001020; border-color:#1e3a5f; color:#6a9acc;">
-      <strong>⚠ Segurança:</strong> Esta chave fica salva apenas no seu navegador (localStorage). Nunca compartilhe sua API Key publicamente — ela dá acesso a dados da sua conta Steam.
+    <div class="login-warn" style="background:#001020; border-color:#1e3a5f; color:#6a9acc; margin-top:20px">
+      <strong>🔒 Segurança:</strong> O login usa o sistema oficial OpenID da Steam — o mesmo que grandes sites utilizam. Nunca compartilhamos sua senha ou dados privados.
     </div>
   </div>
 </div>
@@ -102,7 +404,7 @@
         </div>
         <div class="header-actions">
           <button class="btn-sm" onclick="openGameLibrary()">+ Adicionar Jogos</button>
-          <button class="btn-sm" onclick="refreshData()">↺ Atualizar</button>
+          <button class="btn-sm" onclick="refreshData(true)" title="Recarregar dados da Steam">↺ Atualizar</button>
           <button class="btn-sm" onclick="logout()">✕ Sair</button>
         </div>
       </div>
@@ -114,6 +416,7 @@
         <button class="nav-tab" onclick="showView('overview')" id="tab-overview">Visão Geral</button>
         <button class="nav-tab" onclick="showView('profile')" id="tab-profile">🏆 Perfil Gamer</button>
         <button class="nav-tab" onclick="showView('guides')" id="tab-guides">📖 Guias</button>
+        <button class="nav-tab" onclick="showView('search')" id="tab-search">🔍 Buscar Jogadores</button>
       </div>
     </div>
   </header>
@@ -221,6 +524,103 @@
 
     </div>
 
+    <!-- ── SEARCH VIEW ── -->
+    <div id="view-search" class="hide">
+
+      <!-- Sub-view: busca + resultado -->
+      <div id="search-home-view">
+        <div class="search-hero">
+          <div class="search-hero-icon">🔍</div>
+          <h2 class="search-hero-title">Buscar Jogadores</h2>
+          <p class="search-hero-sub">Pesquise por SteamID64, URL personalizada ou link do perfil Steam</p>
+          <div class="search-bar-wrap">
+            <input
+              type="text"
+              id="search-player-input"
+              class="search-player-input"
+              placeholder="ex: 76561198012345678  ou  meuNomeSteam  ou  steamcommunity.com/id/nome"
+              autocomplete="off"
+              spellcheck="false"
+              onkeydown="if(event.key==='Enter') searchPlayer()"
+            />
+            <button class="btn-search-player" onclick="searchPlayer()">Buscar</button>
+          </div>
+          <div id="search-error" class="search-error hide"></div>
+        </div>
+
+        <!-- Card do jogador encontrado -->
+        <div id="search-result" class="hide">
+          <div class="found-player-card" id="found-player-card"></div>
+          <div id="search-games-section" class="hide">
+            <div class="search-games-header">
+              <span id="search-games-title">Jogos</span>
+              <div class="search-games-filters">
+                <button class="btn-filter active" onclick="setSearchFilter('all',this)">Todos</button>
+                <button class="btn-filter" onclick="setSearchFilter('started',this)">Em Progresso</button>
+                <button class="btn-filter" onclick="setSearchFilter('platinum',this)">Platinados</button>
+              </div>
+            </div>
+            <div class="games-grid" id="search-games-grid"></div>
+          </div>
+        </div>
+      </div><!-- /search-home-view -->
+
+      <!-- Sub-view: perfil do jogador pesquisado (somente leitura) -->
+      <div id="search-profile-detail" class="hide">
+        <button class="detail-back" onclick="backToSearchResult()">← Voltar à Busca</button>
+        <div id="search-profile-container" class="profile-container"></div>
+      </div>
+
+      <!-- Sub-view: conquistas de um jogo do jogador pesquisado -->
+      <div id="search-game-detail" class="hide">
+        <button class="detail-back" onclick="backToSearchedProfile()">← Voltar ao Perfil</button>
+        <div class="detail-banner" id="search-detail-banner">
+          <div class="detail-banner-bg" id="search-detail-banner-bg"></div>
+          <div class="detail-banner-overlay"></div>
+          <div class="detail-banner-content">
+            <div class="detail-banner-top">
+              <div class="detail-banner-info">
+                <div class="detail-banner-tag" id="search-detail-tag"></div>
+                <div class="detail-banner-title" id="search-detail-title"></div>
+                <div class="detail-banner-stats" id="search-detail-stats"></div>
+              </div>
+              <div class="detail-banner-pct">
+                <div class="detail-pct" id="search-detail-pct"></div>
+                <div class="detail-achcount" id="search-detail-achcount"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="ach-filters" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+          <div style="display:flex;gap:8px;">
+            <button class="btn-ach-filter active" onclick="setSearchAchFilter('all',this)">Todos</button>
+            <button class="btn-ach-filter" onclick="setSearchAchFilter('unlocked',this)">Desbloqueados</button>
+            <button class="btn-ach-filter" onclick="setSearchAchFilter('locked',this)">Bloqueados</button>
+          </div>
+          <button class="btn-compare" id="btn-compare" onclick="openCompareView()">⚔️ Comparar Comigo</button>
+        </div>
+        <div class="ach-list" id="search-ach-list"></div>
+      </div><!-- /search-game-detail -->
+
+      <!-- Sub-view: comparação lado a lado -->
+      <div id="search-compare-view" class="hide">
+        <div class="compare-topbar">
+          <button class="detail-back" onclick="backFromCompare()">← Voltar ao Jogo</button>
+          <div class="compare-title" id="compare-title">Comparação</div>
+        </div>
+        <div class="compare-header-cards" id="compare-header-cards"></div>
+        <div class="compare-filters">
+          <button class="btn-filter active" onclick="setCompareFilter('all',this)">Todos</button>
+          <button class="btn-filter" onclick="setCompareFilter('only_me',this)">Só eu tenho</button>
+          <button class="btn-filter" onclick="setCompareFilter('only_them',this)">Só ele(a) tem</button>
+          <button class="btn-filter" onclick="setCompareFilter('both',this)">Ambos temos</button>
+          <button class="btn-filter" onclick="setCompareFilter('neither',this)">Nenhum tem</button>
+        </div>
+        <div id="compare-list" class="compare-list"></div>
+      </div><!-- /search-compare-view -->
+
+    </div><!-- /view-search -->
+
     <!-- ── DETAIL VIEW ── -->
     <div id="view-detail">
       <button class="detail-back" onclick="backToGrid()">← Voltar aos Jogos</button>
@@ -259,7 +659,6 @@
   </main>
 </div>
 
-<script src="config.js"></script>
 <script src="script.js"></script>
 </body>
 </html>

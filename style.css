@@ -604,7 +604,20 @@ input  { font-family: 'Inter', sans-serif; }
 .game-playtime { margin-top: 4px; text-align: center; font-family: 'Inter', sans-serif; font-size: 10px; color: #60a5fa; letter-spacing: 0.5px; }
 
 /* ── GAME DETAIL ── */
-#view-detail { display: none; }
+#view-detail { display: none; position: relative; z-index: 10; }
+#search-game-detail { display: none; }
+#search-game-detail:not(.hide) {
+  display: block;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--bg);
+  z-index: 100;
+  padding: 20px;
+  overflow-y: auto;
+}
 .detail-back {
   background: none; border: 1px solid var(--b2); color: var(--txt2); border-radius: 6px;
   padding: 7px 14px; font-size: 12px; font-family: 'Inter', sans-serif; margin-bottom: 16px; transition: all 0.2s;
