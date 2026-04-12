@@ -73,6 +73,81 @@ app.use(session({
 app.use(passport.initialize());
 app.use(passport.session());
 
+// ── Proxy para How Long To Beat ──────────────────────────────
+app.post('/api/hltb', requireAuth, async (req, res) => {
+  const { gameName } = req.body;
+  if (!gameName) return res.status(400).json({ error: 'Nome do jogo obrigatório' });
+
+  const searchUrl = 'https://howlongtobeat.com/api/search';
+  const payload = {
+    searchType: 'games',
+    searchTerms: gameName.split(' '),
+    searchPage: 1,
+    size: 10,
+    searchOptions: {
+      games: {
+        userId: 0, platform: '', sortCategory: 'popular', rangeCategory: 'main',
+        rangeTime: { min: 0, max: 0 },
+        gameplay: { perspective: '', flow: '', genre: '' }, modifier: ''
+      },
+      users: { sortCategory: 'postcount' },
+      filter: '', sort: 0, randomizer: 0
+    }
+  };
+
+  try {
+    const response = await fetch(searchUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+      },
+      body: JSON.stringify(payload),
+      timeout: 10000
+    });
+
+    if (!response.ok) {
+      return res.status(response.status).json({ error: `HLTB API retornou ${response.status}` });
+    }
+
+    const data = await response.json();
+
+    if (data?.data && data.data.length > 0) {
+      const matches = data.data.map(game => {
+        const hltbName = game.game_name?.toLowerCase() || '';
+        const searchName = gameName.toLowerCase();
+        let score = 0;
+        if (hltbName === searchName) score = 100;
+        else if (hltbName.includes(searchName)) score = 80;
+        else if (searchName.includes(hltbName)) score = 60;
+        else {
+          const hltbWords = hltbName.split(/\s+/);
+          const searchWords = searchName.split(/\s+/);
+          const common = hltbWords.filter(w => searchWords.includes(w));
+          score = (common.length / Math.max(hltbWords.length, searchWords.length)) * 50;
+        }
+        return { game, score };
+      });
+
+      matches.sort((a, b) => b.score - a.score);
+      const bestMatch = matches[0].game;
+
+      return res.json({
+        main: Math.round(bestMatch.gameplayMain || 0),
+        mainExtra: Math.round(bestMatch.gameplayMainExtra || 0),
+        completionist: Math.round(bestMatch.gameplayCompletionist || 0),
+        name: bestMatch.game_name
+      });
+    }
+
+    res.json(null);
+  } catch (err) {
+    console.error('[HLTB] Erro:', err.message);
+    res.status(500).json({ error: 'Erro ao buscar dados do HLTB' });
+  }
+});
+
 // Servir os arquivos estáticos do projeto (HTML, CSS, JS)
 app.use(express.static(path.join(__dirname)));
 

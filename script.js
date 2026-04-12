@@ -320,57 +320,16 @@ async function steamFetch(url) {
 
 // ── HOW LONG TO BEAT API ──
 async function fetchHLTBTime(gameName) {
-  const searchUrl = 'https://howlongtobeat.com/api/search';
-  const payload = {
-    searchType: 'games',
-    searchTerms: gameName.split(' '),
-    searchPage: 1,
-    size: 10,
-    searchOptions: {
-      games: {
-        userId: 0, platform: '', sortCategory: 'popular', rangeCategory: 'main',
-        rangeTime: { min: 0, max: 0 },
-        gameplay: { perspective: '', flow: '', genre: '' }, modifier: ''
-      },
-      users: { sortCategory: 'postcount' },
-      filter: '', sort: 0, randomizer: 0
-    }
-  };
   try {
-    const res = await fetch(searchUrl, {
+    const res = await fetch('/api/hltb', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'User-Agent': 'Mozilla/5.0' },
-      body: JSON.stringify(payload)
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ gameName })
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-    if (data?.data && data.data.length > 0) {
-      const matches = data.data.map(game => {
-        const hltbName = game.game_name?.toLowerCase() || '';
-        const searchName = gameName.toLowerCase();
-        let score = 0;
-        if (hltbName === searchName) score = 100;
-        else if (hltbName.includes(searchName)) score = 80;
-        else if (searchName.includes(hltbName)) score = 60;
-        else {
-          const hltbWords = hltbName.split(/\s+/);
-          const searchWords = searchName.split(/\s+/);
-          const common = hltbWords.filter(w => searchWords.includes(w));
-          score = (common.length / Math.max(hltbWords.length, searchWords.length)) * 50;
-        }
-        return { game, score };
-      });
-      matches.sort((a, b) => b.score - a.score);
-      const bestMatch = matches[0].game;
-      return {
-        main: Math.round(bestMatch.gameplayMain || 0),
-        mainExtra: Math.round(bestMatch.gameplayMainExtra || 0),
-        completionist: Math.round(bestMatch.gameplayCompletionist || 0),
-        name: bestMatch.game_name
-      };
-    }
-    return null;
+    return await res.json();
   } catch (err) {
+    console.error('[HLTB] Erro ao buscar:', err.message);
     return null;
   }
 }
@@ -1248,9 +1207,9 @@ function openGame(appid) {
     hltbRow.style.display = 'flex';
     fetchHLTBTime(g.name).then(hltbData => {
       if (hltbData) { g.hltb = hltbData; save(); renderHLTBTimes(hltbRow, hltbData); }
-      else hltbRow.innerHTML = '<div class="hltb-unavailable">ℹ️ Tempos HLTB indisponíveis (instale extensão CORS Unblock para ativar)</div>';
+      else hltbRow.innerHTML = '<div class="hltb-unavailable">ℹ️ Tempos HLTB indisponíveis</div>';
     }).catch(() => {
-      hltbRow.innerHTML = '<div class="hltb-unavailable">ℹ️ Tempos HLTB indisponíveis (instale extensão CORS Unblock para ativar)</div>';
+      hltbRow.innerHTML = '<div class="hltb-unavailable">ℹ️ Tempos HLTB indisponíveis</div>';
     });
   }
   const byType = { P:0,G:0,S:0,B:0 };
