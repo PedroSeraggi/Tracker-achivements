@@ -1,0 +1,35 @@
+{
+  "name": "steam-trophy-tracker",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Steam Trophy Tracker — React + TypeScript + Zustand + Express",
+  "scripts": {
+    "dev":     "vite",
+    "build":   "tsc && vite build",
+    "preview": "vite preview",
+    "server":  "node server.js",
+    "server:watch": "nodemon server.js",
+    "start":   "NODE_ENV=production node server.js"
+  },
+  "dependencies": {
+    "dotenv":          "^16.4.5",
+    "express":         "^4.19.2",
+    "express-session": "^1.18.0",
+    "passport":        "^0.7.0",
+    "passport-steam":  "^1.0.18",
+    "react":           "^18.3.1",
+    "react-dom":       "^18.3.1",
+    "zustand":         "^4.5.4"
+  },
+  "devDependencies": {
+    "@types/react":         "^18.3.3",
+    "@types/react-dom":     "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "nodemon":              "^3.1.4",
+    "typescript":           "^5.5.3",
+    "vite":                 "^5.3.4"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

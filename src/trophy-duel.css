@@ -1,0 +1,598 @@
+/* ==========================================================
+   trophy-duel.css
+   Collectible card styles for the Trophy Duel React feature.
+   Import in main.tsx or your global CSS entry point:
+     import './styles/trophy-duel.css';
+   ========================================================== */
+
+/* ── Rarity Color Tokens ─────────────────────────────────── */
+:root {
+  --rarity-common    : #9ca3af;
+  --rarity-uncommon  : #4ade80;
+  --rarity-rare      : #60a5fa;
+  --rarity-epic      : #c084fc;
+  --rarity-legendary : #fbbf24;
+  --rarity-mythic    : #f472b6;
+
+  --card-width  : 200px;
+  --card-height : 300px;
+  --card-radius : 14px;
+}
+
+/* ── View Shell ──────────────────────────────────────────── */
+#view-duel {
+  padding: 0 0 60px;
+}
+
+/* ── Top Bar ─────────────────────────────────────────────── */
+.duel-topbar {
+  display        : flex;
+  align-items    : center;
+  justify-content: space-between;
+  gap            : 16px;
+  padding        : 20px 20px 8px;
+  flex-wrap      : wrap;
+}
+
+.duel-topbar-title {
+  font-size     : 20px;
+  font-weight   : 800;
+  color         : #fff;
+  letter-spacing: -0.3px;
+}
+
+.duel-topbar-sub {
+  font-size : 13px;
+  color     : var(--txt2, #8899aa);
+  margin-top: 2px;
+}
+
+/* ── Phase: Game Selection ───────────────────────────────── */
+.duel-phase {
+  padding: 0 20px;
+}
+
+.duel-phase-label {
+  font-size     : 11px;
+  font-weight   : 700;
+  letter-spacing: 2px;
+  color         : var(--txt3, #556677);
+  text-transform: uppercase;
+  margin-bottom : 14px;
+  padding-top   : 16px;
+}
+
+.duel-game-selection-grid {
+  display              : grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap                  : 12px;
+  margin-bottom        : 24px;
+}
+
+.duel-game-tile {
+  position       : relative;
+  background     : var(--bg2, #1a2332);
+  border         : 2px solid var(--b2, #223344);
+  border-radius  : 10px;
+  padding        : 12px;
+  cursor         : pointer;
+  transition     : border-color 0.2s, transform 0.15s, box-shadow 0.2s;
+  user-select    : none;
+  outline        : none;
+}
+
+.duel-game-tile:hover {
+  border-color: var(--accent, #3a7acc);
+  transform   : translateY(-2px);
+  box-shadow  : 0 6px 18px rgba(58, 122, 204, 0.2);
+}
+
+.duel-game-tile:focus-visible {
+  outline       : 2px solid var(--accent, #3a7acc);
+  outline-offset: 2px;
+}
+
+.duel-game-tile.selected {
+  border-color: var(--accent, #3a7acc);
+  background  : rgba(58, 122, 204, 0.08);
+  box-shadow  : inset 0 0 0 1px var(--accent, #3a7acc);
+}
+
+.duel-game-tile.disabled {
+  opacity       : 0.4;
+  cursor        : not-allowed;
+  pointer-events: none;
+}
+
+/* Selection checkmark badge */
+.duel-tile-check {
+  position      : absolute;
+  top           : 8px;
+  right         : 8px;
+  width         : 22px;
+  height        : 22px;
+  border-radius : 50%;
+  background    : var(--accent, #3a7acc);
+  display       : flex;
+  align-items   : center;
+  justify-content: center;
+  font-size     : 11px;
+  color         : #fff;
+  font-weight   : 700;
+  opacity       : 0;
+  transform     : scale(0.6);
+  transition    : opacity 0.15s, transform 0.15s;
+}
+
+.duel-game-tile.selected .duel-tile-check {
+  opacity  : 1;
+  transform: scale(1);
+}
+
+.duel-tile-img {
+  width         : 100%;
+  height        : 80px;
+  object-fit    : cover;
+  border-radius : 6px;
+  background    : var(--bg3, #0f1923);
+  display       : block;
+  margin-bottom : 8px;
+}
+
+.duel-tile-img-ph {
+  width          : 100%;
+  height         : 80px;
+  border-radius  : 6px;
+  background     : var(--bg3, #0f1923);
+  display        : flex;
+  align-items    : center;
+  justify-content: center;
+  font-size      : 28px;
+  margin-bottom  : 8px;
+}
+
+.duel-tile-name {
+  font-size     : 12px;
+  font-weight   : 600;
+  color         : #fff;
+  white-space   : nowrap;
+  overflow      : hidden;
+  text-overflow : ellipsis;
+}
+
+.duel-tile-meta {
+  font-size : 10px;
+  color     : var(--txt3, #556677);
+  margin-top: 3px;
+}
+
+/* ── Buttons ─────────────────────────────────────────────── */
+.btn-duel-generate {
+  background    : linear-gradient(135deg, #fbbf24, #f59e0b);
+  border        : none;
+  border-radius : 10px;
+  padding       : 12px 28px;
+  color         : #000;
+  font-weight   : 800;
+  font-size     : 14px;
+  cursor        : pointer;
+  transition    : opacity 0.2s, transform 0.15s;
+  letter-spacing: 0.3px;
+  display       : inline-flex;
+  align-items   : center;
+  gap           : 8px;
+}
+
+.btn-duel-generate:hover:not(:disabled) {
+  opacity  : 0.9;
+  transform: translateY(-2px);
+}
+
+.btn-duel-generate:disabled {
+  opacity   : 0.35;
+  cursor    : not-allowed;
+  transform : none;
+}
+
+.btn-duel-reset {
+  background   : transparent;
+  border       : 1px solid var(--b2, #223344);
+  border-radius: 8px;
+  padding      : 10px 16px;
+  color        : var(--txt2, #8899aa);
+  font-size    : 13px;
+  font-weight  : 600;
+  cursor       : pointer;
+  transition   : border-color 0.2s, color 0.2s;
+}
+
+.btn-duel-reset:hover {
+  border-color: #f87171;
+  color       : #f87171;
+}
+
+/* ── Loading ─────────────────────────────────────────────── */
+.duel-loading {
+  text-align: center;
+  padding   : 48px 20px;
+}
+
+.duel-loading-spinner {
+  width        : 48px;
+  height       : 48px;
+  border       : 3px solid var(--b2, #223344);
+  border-top-color: var(--accent, #3a7acc);
+  border-radius: 50%;
+  animation    : duel-spin 0.8s linear infinite;
+  margin       : 0 auto 20px;
+}
+
+@keyframes duel-spin {
+  to { transform: rotate(360deg); }
+}
+
+.duel-loading-text {
+  color    : var(--txt2, #8899aa);
+  font-size: 14px;
+}
+
+/* ── Deck Stats Bar ──────────────────────────────────────── */
+.duel-deck-stats {
+  display      : flex;
+  gap          : 12px;
+  padding      : 16px 20px;
+  flex-wrap    : wrap;
+  align-items  : center;
+  background   : var(--bg2, #1a2332);
+  border-bottom: 1px solid var(--b2, #223344);
+  margin-bottom: 20px;
+}
+
+.duel-stat-pill {
+  display        : flex;
+  align-items    : center;
+  gap            : 6px;
+  background     : var(--bg3, #0f1923);
+  border         : 1px solid var(--b2, #223344);
+  border-radius  : 20px;
+  padding        : 6px 14px;
+  font-size      : 12px;
+  font-weight    : 600;
+}
+
+.pill-dot {
+  width        : 8px;
+  height       : 8px;
+  border-radius: 50%;
+  flex-shrink  : 0;
+}
+
+.pill-count { color: #fff; margin-left: 2px; }
+
+/* Rarity dot colors */
+.dot-common    { background: var(--rarity-common);    }
+.dot-uncommon  { background: var(--rarity-uncommon);  }
+.dot-rare      { background: var(--rarity-rare);      }
+.dot-epic      { background: var(--rarity-epic);      }
+.dot-legendary { background: var(--rarity-legendary); }
+.dot-mythic    { background: var(--rarity-mythic);    }
+
+.duel-total-cards {
+  font-size  : 13px;
+  color      : var(--txt2, #8899aa);
+  margin-left: auto;
+}
+
+/* ── Controls ────────────────────────────────────────────── */
+.duel-controls {
+  display    : flex;
+  align-items: center;
+  gap        : 10px;
+  padding    : 0 20px 16px;
+  flex-wrap  : wrap;
+}
+
+.duel-sort-label {
+  font-size     : 11px;
+  color         : var(--txt3, #556677);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.duel-sort-btn {
+  background   : var(--bg3, #0f1923);
+  border       : 1px solid var(--b2, #223344);
+  border-radius: 6px;
+  padding      : 6px 12px;
+  color        : var(--txt2, #8899aa);
+  font-size    : 12px;
+  font-weight  : 600;
+  cursor       : pointer;
+  transition   : border-color 0.2s, color 0.2s;
+}
+
+.duel-sort-btn.active,
+.duel-sort-btn:hover {
+  border-color: var(--accent, #3a7acc);
+  color       : #fff;
+}
+
+.duel-filter-sep {
+  width     : 1px;
+  height    : 20px;
+  background: var(--b2, #223344);
+  margin    : 0 4px;
+}
+
+/* ── Card Grid ───────────────────────────────────────────── */
+.duel-card-grid {
+  display              : grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--card-width), 1fr));
+  gap                  : 20px;
+  padding              : 0 20px 40px;
+}
+
+/* ── Trophy Card ─────────────────────────────────────────── */
+.trophy-card {
+  position  : relative;
+  width     : 100%;
+  max-width : var(--card-width);
+  height    : var(--card-height);
+  cursor    : default;
+  margin    : 0 auto;
+  animation : card-deal 0.35s ease both;
+  /* Perspective for 3D tilt */
+  perspective: 800px;
+}
+
+.trophy-card-inner {
+  position      : relative;
+  width         : 100%;
+  height        : 100%;
+  border-radius : var(--card-radius);
+  overflow      : hidden;
+  background    : var(--bg2, #1a2332);
+  border        : 2px solid transparent;
+  display       : flex;
+  flex-direction: column;
+  /* Smooth tilt transition when mouse leaves */
+  transition    : transform 0.15s ease, box-shadow 0.25s ease;
+  transform-style: preserve-3d;
+}
+
+/* Rarity borders + base glows */
+.trophy-card[data-rarity="common"]    .trophy-card-inner { border-color: var(--rarity-common);    box-shadow: 0 4px 14px rgba(156,163,175,0.25); }
+.trophy-card[data-rarity="uncommon"]  .trophy-card-inner { border-color: var(--rarity-uncommon);  box-shadow: 0 4px 14px rgba(74,222,128,0.25);  }
+.trophy-card[data-rarity="rare"]      .trophy-card-inner { border-color: var(--rarity-rare);      box-shadow: 0 4px 18px rgba(96,165,250,0.35);  }
+.trophy-card[data-rarity="epic"]      .trophy-card-inner { border-color: var(--rarity-epic);      box-shadow: 0 4px 20px rgba(192,132,252,0.4);  }
+.trophy-card[data-rarity="legendary"] .trophy-card-inner { border-color: var(--rarity-legendary); box-shadow: 0 6px 28px rgba(251,191,36,0.5);   }
+.trophy-card[data-rarity="mythic"]    .trophy-card-inner { border-color: var(--rarity-mythic);    box-shadow: 0 8px 32px rgba(244,114,182,0.55); }
+
+/* Hover glow amplification */
+.trophy-card[data-rarity="legendary"]:hover .trophy-card-inner { box-shadow: 0 12px 44px rgba(251,191,36,0.7);    }
+.trophy-card[data-rarity="mythic"]:hover    .trophy-card-inner { box-shadow: 0 14px 52px rgba(244,114,182,0.75); }
+
+/* ── Card Art Area ───────────────────────────────────────── */
+.card-art-area {
+  position: relative;
+  flex    : 0 0 130px;
+  overflow: hidden;
+}
+
+.card-art-bg {
+  position           : absolute;
+  inset              : 0;
+  background-size    : cover;
+  background-position: center;
+  filter             : blur(8px) brightness(0.4);
+  transform          : scale(1.1); /* prevent blur edge bleed */
+}
+
+.card-art-icon {
+  position : absolute;
+  top      : 50%;
+  left     : 50%;
+  transform: translate(-50%, -50%);
+  width    : 72px;
+  height   : 72px;
+  border-radius: 10px;
+  object-fit   : contain;
+  filter   : drop-shadow(0 4px 12px rgba(0,0,0,0.6));
+  z-index  : 1;
+}
+
+.card-art-icon-ph {
+  position : absolute;
+  top      : 50%;
+  left     : 50%;
+  transform: translate(-50%, -50%);
+  font-size: 44px;
+  z-index  : 1;
+  filter   : drop-shadow(0 4px 10px rgba(0,0,0,0.5));
+}
+
+/* Rarity badge */
+.card-rarity-badge {
+  position     : absolute;
+  top          : 8px;
+  left         : 8px;
+  z-index      : 2;
+  background   : rgba(0,0,0,0.72);
+  border-radius: 4px;
+  padding      : 3px 8px;
+  font-size    : 9px;
+  font-weight  : 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
+
+.trophy-card[data-rarity="common"]    .card-rarity-badge { color: var(--rarity-common);    border: 1px solid var(--rarity-common);    }
+.trophy-card[data-rarity="uncommon"]  .card-rarity-badge { color: var(--rarity-uncommon);  border: 1px solid var(--rarity-uncommon);  }
+.trophy-card[data-rarity="rare"]      .card-rarity-badge { color: var(--rarity-rare);      border: 1px solid var(--rarity-rare);      }
+.trophy-card[data-rarity="epic"]      .card-rarity-badge { color: var(--rarity-epic);      border: 1px solid var(--rarity-epic);      }
+.trophy-card[data-rarity="legendary"] .card-rarity-badge { color: var(--rarity-legendary); border: 1px solid var(--rarity-legendary); }
+.trophy-card[data-rarity="mythic"]    .card-rarity-badge { color: var(--rarity-mythic);    border: 1px solid var(--rarity-mythic);    }
+
+/* Game thumbnail bottom-left */
+.card-game-thumb {
+  position     : absolute;
+  bottom       : 7px;
+  left         : 7px;
+  width        : 48px;
+  height       : 22px;
+  border-radius: 4px;
+  overflow     : hidden;
+  z-index      : 2;
+  border       : 1px solid rgba(255,255,255,0.15);
+  background   : rgba(0,0,0,0.4);
+}
+
+.card-game-thumb img {
+  width     : 100%;
+  height    : 100%;
+  object-fit: cover;
+  display   : block;
+}
+
+/* Shine sweep on Legendary/Mythic */
+.trophy-card[data-rarity="legendary"] .card-art-area::after,
+.trophy-card[data-rarity="mythic"]    .card-art-area::after {
+  content        : '';
+  position       : absolute;
+  inset          : 0;
+  background     : linear-gradient(115deg, transparent 30%, rgba(255,255,255,0.08) 50%, transparent 70%);
+  background-size: 200% 100%;
+  animation      : card-shine 3s linear infinite;
+  pointer-events : none;
+  z-index        : 3;
+}
+
+@keyframes card-shine {
+  0%   { background-position:  200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ── Card Body ───────────────────────────────────────────── */
+.card-body {
+  flex          : 1;
+  padding       : 10px 12px;
+  display       : flex;
+  flex-direction: column;
+  gap           : 4px;
+  background    : linear-gradient(180deg, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0) 100%);
+}
+
+.card-ach-name {
+  font-size  : 11.5px;
+  font-weight: 700;
+  color      : #fff;
+  line-height: 1.3;
+  display            : -webkit-box;
+  -webkit-line-clamp : 2;
+  line-clamp         : 2;
+  -webkit-box-orient : vertical;
+  overflow           : hidden;
+}
+
+.card-game-name {
+  font-size    : 10px;
+  color        : var(--txt3, #556677);
+  white-space  : nowrap;
+  overflow     : hidden;
+  text-overflow: ellipsis;
+  margin-top   : 2px;
+}
+
+.card-ach-desc {
+  font-size  : 11px;
+  color      : var(--txt2, #8899aa);
+  line-height: 1.35;
+  margin-top : 6px;
+  max-height : 30px;
+  overflow   : hidden;
+  display            : -webkit-box;
+  -webkit-line-clamp : 2;
+  line-clamp         : 2;
+  -webkit-box-orient : vertical;
+}
+
+/* ── Card Footer ─────────────────────────────────────────── */
+.card-footer {
+  padding        : 8px 12px 10px;
+  display        : flex;
+  align-items    : center;
+  justify-content: space-between;
+  border-top     : 1px solid rgba(255,255,255,0.06);
+}
+
+.card-unlock-pct {
+  font-size  : 10px;
+  color      : var(--txt3, #556677);
+  display    : flex;
+  align-items: center;
+  gap        : 4px;
+}
+
+.card-unlock-pct::before { content: '👥'; font-size: 9px; }
+
+.card-damage-block {
+  display    : flex;
+  align-items: center;
+  gap        : 5px;
+}
+
+.card-damage-icon  { font-size: 12px; }
+
+.card-damage-value {
+  font-size     : 18px;
+  font-weight   : 900;
+  line-height   : 1;
+  letter-spacing: -0.5px;
+}
+
+/* Damage color by rarity */
+.trophy-card[data-rarity="common"]    .card-damage-value { color: var(--rarity-common);    }
+.trophy-card[data-rarity="uncommon"]  .card-damage-value { color: var(--rarity-uncommon);  }
+.trophy-card[data-rarity="rare"]      .card-damage-value { color: var(--rarity-rare);      }
+.trophy-card[data-rarity="epic"]      .card-damage-value { color: var(--rarity-epic);      }
+.trophy-card[data-rarity="legendary"] .card-damage-value { color: var(--rarity-legendary); }
+.trophy-card[data-rarity="mythic"]    .card-damage-value { color: var(--rarity-mythic);    }
+
+/* ── Entry Animation ─────────────────────────────────────── */
+@keyframes card-deal {
+  from { opacity: 0; transform: translateY(24px) scale(0.94); }
+  to   { opacity: 1; transform: translateY(0)    scale(1);    }
+}
+
+/* ── Empty / Error ───────────────────────────────────────── */
+.duel-empty-state {
+  text-align: center;
+  padding   : 56px 20px;
+  color     : var(--txt2, #8899aa);
+}
+
+.duel-empty-icon  { font-size: 48px; margin-bottom: 16px; }
+.duel-empty-title { font-size: 16px; font-weight: 700; color: #fff; margin-bottom: 8px; }
+.duel-empty-sub   { font-size: 13px; max-width: 420px; margin: 0 auto; }
+
+.duel-error-banner {
+  margin       : 0 0 16px;
+  padding      : 12px 16px;
+  background   : #200a0a;
+  border       : 1px solid #5a1a1a;
+  border-radius: 8px;
+  color        : #f87171;
+  font-size    : 13px;
+}
+
+/* ── Responsive ──────────────────────────────────────────── */
+@media (max-width: 600px) {
+  :root {
+    --card-width : 160px;
+    --card-height: 260px;
+  }
+
+  .duel-card-grid { gap: 14px; padding: 0 12px 40px; }
+  .duel-phase     { padding: 0 12px; }
+  .duel-topbar    { padding: 16px 12px 8px; }
+}
