@@ -399,6 +399,46 @@ const DuelUI = (() => {
     container.querySelectorAll('[data-filter]').forEach(b => b.addEventListener('click', () => onFilter(b.dataset.filter)));
     const resetBtn = container.querySelector('#btn-duel-reset');
     if (resetBtn) resetBtn.addEventListener('click', onReset);
+
+    // Ativar efeito de tilt 3D nas cartas
+    initCardTilt(container);
+  }
+
+  /* Efeito de inclinação 3D nas cartas */
+  function initCardTilt(container) {
+    const cards = container.querySelectorAll('.trophy-card');
+    cards.forEach(card => {
+      const inner = card.querySelector('.trophy-card-inner');
+      if (!inner) return;
+
+      card.addEventListener('mousemove', (e) => {
+        const rect = card.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        const centerX = rect.width / 2;
+        const centerY = rect.height / 2;
+
+        // Calcular rotação baseada na posição do mouse (-15 a 15 graus)
+        const rotateX = ((y - centerY) / centerY) * -12;
+        const rotateY = ((x - centerX) / centerX) * 12;
+
+        card.classList.add('tilt-active');
+        inner.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) translateY(-20px) scale(1.15)`;
+      });
+
+      card.addEventListener('mouseleave', () => {
+        card.classList.remove('tilt-active');
+        card.classList.remove('focused');
+        inner.style.transform = 'perspective(1000px) rotateX(0deg) rotateY(0deg) scale(1)';
+        setTimeout(() => {
+          inner.style.transform = '';
+        }, 150);
+      });
+
+      card.addEventListener('mouseenter', () => {
+        card.classList.add('focused');
+      });
+    });
   }
 
   function renderError(container, message) {
