@@ -13,6 +13,7 @@ export interface Game {
   appId: number;
   name: string;
   headerImage: string;
+  heroImage: string;
   playtimeForever: number; // minutes
   achievements: Achievement[];
   // computed

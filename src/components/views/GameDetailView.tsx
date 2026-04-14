@@ -83,7 +83,7 @@ const GameDetailView: React.FC = () => {
       <div className="detail-banner">
         <div
           className="detail-banner-bg"
-          style={{ backgroundImage: `url(${game.headerImage})` }}
+          style={{ backgroundImage: `url(${game.heroImage})` }}
         />
         <div className="detail-banner-overlay" />
         <div className="detail-banner-content">
@@ -186,7 +186,7 @@ const GameDetailView: React.FC = () => {
           </div>
         ) : (
           achievements.map((ach) => (
-            <AchievementItem key={ach.apiName} achievement={ach} />
+            <AchievementItem key={ach.apiName} achievement={ach} game={game} />
           ))
         )}
       </div>

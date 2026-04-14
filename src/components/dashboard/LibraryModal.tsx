@@ -22,6 +22,7 @@ function buildGame(raw: ApiGame, achievements: Achievement[]): Game {
     appId: raw.appid,
     name: raw.name,
     headerImage: `https://cdn.akamai.steamstatic.com/steam/apps/${raw.appid}/header.jpg`,
+    heroImage: `https://cdn.akamai.steamstatic.com/steam/apps/${raw.appid}/library_hero.jpg`,
     playtimeForever: raw.playtime_forever,
     achievements,
     unlockedCount: unlocked,

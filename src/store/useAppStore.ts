@@ -26,6 +26,8 @@ interface AppState {
   // ── Games / Data
   games: Game[];
   loading: LoadingState;
+  featuredGameIds: number[]; // games featured in profile
+  perfectGameIds: number[]; // platinum games showcased in profile
 
   // ── Dashboard navigation
   dashView: DashView;
@@ -70,6 +72,15 @@ interface AppState {
   setGames: (g: Game[]) => void;
   setLoading: (l: Partial<LoadingState>) => void;
   addLoadingGame: (name: string) => void;
+
+  // Featured games actions
+  addFeaturedGame: (appId: number) => void;
+  removeFeaturedGame: (appId: number) => void;
+  setFeaturedGameIds: (ids: number[]) => void;
+  // Perfect games actions
+  addPerfectGame: (appId: number) => void;
+  removePerfectGame: (appId: number) => void;
+  setPerfectGameIds: (ids: number[]) => void;
 
   setDashView: (v: DashView) => void;
   openGameDetail: (appId: number) => void;
@@ -132,6 +143,8 @@ export const useAppStore = create<AppState>()(
         currentUser: null,
         games: [],
         loading: { status: 'Iniciando...', progress: 0, loadedGames: [] },
+        featuredGameIds: [],
+        perfectGameIds: [],
         dashView: 'grid',
         activeGameAppId: null,
         gameFilter: 'all',
@@ -180,6 +193,32 @@ export const useAppStore = create<AppState>()(
               loadedGames: [...s.loading.loadedGames, name],
             },
           })),
+
+        // ── Featured games
+        addFeaturedGame: (appId) =>
+          set((s) => ({
+            featuredGameIds: s.featuredGameIds.includes(appId)
+              ? s.featuredGameIds
+              : [...s.featuredGameIds, appId].slice(0, 6),
+          })),
+        removeFeaturedGame: (appId) =>
+          set((s) => ({
+            featuredGameIds: s.featuredGameIds.filter((id) => id !== appId),
+          })),
+        setFeaturedGameIds: (ids) => set({ featuredGameIds: ids.slice(0, 6) }),
+
+        // ── Perfect games
+        addPerfectGame: (appId) =>
+          set((s) => ({
+            perfectGameIds: s.perfectGameIds.includes(appId)
+              ? s.perfectGameIds
+              : [...s.perfectGameIds, appId].slice(0, 6),
+          })),
+        removePerfectGame: (appId) =>
+          set((s) => ({
+            perfectGameIds: s.perfectGameIds.filter((id) => id !== appId),
+          })),
+        setPerfectGameIds: (ids) => set({ perfectGameIds: ids.slice(0, 6) }),
 
         // ── Dashboard
         setDashView: (dashView) =>
@@ -295,8 +334,8 @@ export const useAppStore = create<AppState>()(
       }),
       {
         name: 'steam-tracker-storage',
-        // Only persist guides locally; auth/games come from server
-        partialize: (s) => ({ guides: s.guides }),
+        // Only persist guides and featured/perfect games locally; auth/games come from server
+        partialize: (s) => ({ guides: s.guides, featuredGameIds: s.featuredGameIds, perfectGameIds: s.perfectGameIds }),
       }
     )
   )

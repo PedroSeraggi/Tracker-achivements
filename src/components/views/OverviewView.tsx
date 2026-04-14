@@ -12,7 +12,7 @@ interface StatCardProps {
 
 const StatCard: React.FC<StatCardProps> = ({ label, value, color = 'var(--accent)', sub }) => (
   <div className="overview-stat-card">
-    <div style={{ fontSize: 28, fontWeight: 900, color }}>{value}</div>
+    <div style={{ fontSize: 22, fontWeight: 900, color, textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'pointer' }}>{value}</div>
     <div style={{ fontSize: 12, color: 'var(--txt2)', fontWeight: 600, marginTop: 4 }}>
       {label}
     </div>

@@ -266,7 +266,7 @@ const SearchGameDetail: React.FC = () => {
       <div className="detail-banner">
         <div
           className="detail-banner-bg"
-          style={{ backgroundImage: `url(${game.headerImage})` }}
+          style={{ backgroundImage: `url(${game.heroImage})` }}
         />
         <div className="detail-banner-overlay" />
         <div className="detail-banner-content">

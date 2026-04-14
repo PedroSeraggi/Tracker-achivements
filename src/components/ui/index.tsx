@@ -15,7 +15,7 @@ const TROPHY_LABELS: Record<TrophyTier, string> = {
   bronze: 'Bronze',
   silver: 'Prata',
   gold: 'Ouro',
-  platinum: '✦ Platina',
+  platinum: '✦ Diamante',
 };
 
 interface TrophyBadgeProps {
