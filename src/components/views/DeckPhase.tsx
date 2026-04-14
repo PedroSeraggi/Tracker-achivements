@@ -25,6 +25,7 @@ interface DeckPhaseProps {
   onFilter      : (filter: DuelRarityFilter) => void;
   onSearch      : (query: string) => void;
   onReset       : () => void;
+  onSave?       : () => void;
 }
 
 const DeckPhase: React.FC<DeckPhaseProps> = ({
@@ -36,6 +37,7 @@ const DeckPhase: React.FC<DeckPhaseProps> = ({
   onFilter,
   onSearch,
   onReset,
+  onSave,
 }) => {
   // Memoized so sort/filter don't re-run on unrelated parent renders
   const stats = useMemo(() => buildRarityStats(allCards), [allCards]);
@@ -65,9 +67,28 @@ const DeckPhase: React.FC<DeckPhaseProps> = ({
           <div className="duel-topbar-title">⚔️ Trophy Duel — Seu Deck</div>
           <div className="duel-topbar-sub">{allCards.length} cartas geradas</div>
         </div>
-        <button className="btn-duel-reset" onClick={onReset}>
-          ↺ Novo Deck
-        </button>
+        <div style={{ display: 'flex', gap: 10 }}>
+          {onSave && (
+            <button
+              className="btn-duel-save"
+              onClick={onSave}
+              style={{
+                background: 'var(--accent)',
+                border: 'none',
+                borderRadius: 8,
+                padding: '8px 16px',
+                color: '#fff',
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              💾 Salvar Deck
+            </button>
+          )}
+          <button className="btn-duel-reset" onClick={onReset}>
+            ↺ Novo Deck
+          </button>
+        </div>
       </div>
 
       {/* Stats bar */}

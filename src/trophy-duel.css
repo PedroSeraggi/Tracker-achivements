@@ -5,6 +5,78 @@
      import './styles/trophy-duel.css';
    ========================================================== */
 
+/* ── Tabs ───────────────────────────────────────────────── */
+.duel-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 12px 20px 0;
+  border-bottom: 1px solid var(--b2);
+}
+
+.duel-tab {
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--txt2);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.duel-tab:hover {
+  color: var(--txt);
+  background: var(--bg2);
+  border-radius: 8px 8px 0 0;
+}
+
+.duel-tab.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+/* ── Saved Decks Stack Effect ──────────────────────────── */
+.saved-deck-card {
+  position: relative;
+  border-radius: 8px;
+  z-index: 1;
+}
+
+.saved-deck-card:hover {
+  transform: translateY(-2px);
+  z-index: 100;
+}
+
+/* Stack effect on hover - images spread apart (adjusted for larger images) */
+.saved-deck-card:hover .games-stack .game-cover[data-index="0"] {
+  transform: translateX(0) rotate(0deg);
+}
+
+.saved-deck-card:hover .games-stack .game-cover[data-index="1"] {
+  transform: translateX(55px) rotate(2deg);
+}
+
+.saved-deck-card:hover .games-stack .game-cover[data-index="2"] {
+  transform: translateX(110px) rotate(-1deg);
+}
+
+.saved-deck-card:hover .games-stack .game-cover[data-index="3"] {
+  transform: translateX(165px) rotate(3deg);
+}
+
+.saved-deck-card:hover .games-stack .game-cover[data-index="4"] {
+  transform: translateX(220px) rotate(-2deg);
+}
+
+.saved-deck-card:hover .games-stack .game-cover[data-index="5"] {
+  transform: translateX(275px) rotate(1deg);
+}
+
+.saved-deck-card:hover .games-stack .game-cover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5) !important;
+}
+
 /* ── Rarity Color Tokens ─────────────────────────────────── */
 :root {
   --rarity-common    : #9ca3af;

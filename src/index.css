@@ -540,6 +540,9 @@
   .profile-container {
     width: 100%;
   }
+  .level-badge:hover {
+    border-color: var(--accent) !important;
+  }
   .featured-games-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));

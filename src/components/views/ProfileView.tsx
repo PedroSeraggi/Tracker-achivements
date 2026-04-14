@@ -17,15 +17,20 @@ function calcXP(games: Game[]): number {
 }
 
 const LEVELS = [
-  { min: 0,     title: '🎮 Iniciante',       label: 'Nível 1' },
-  { min: 500,   title: '🕹 Jogador',          label: 'Nível 2' },
-  { min: 1500,  title: '⚔️ Aventureiro',      label: 'Nível 3' },
-  { min: 3500,  title: '🏅 Veterano',         label: 'Nível 4' },
-  { min: 7000,  title: '🥇 Caçador',          label: 'Nível 5' },
-  { min: 12000, title: '💎 Elite',            label: 'Nível 6' },
-  { min: 20000, title: '👑 Mestre',           label: 'Nível 7' },
-  { min: 30000, title: '🌟 Lendário',         label: 'Nível 8' },
-  { min: 50000, title: '✦ Platina Supremo',   label: 'Nível 9' },
+  { min: 0,       title: '🎮 Iniciante',          label: 'Nível 1' },
+  { min: 500,     title: '🕹 Jogador',             label: 'Nível 2' },
+  { min: 1500,    title: '⚔️ Aventureiro',        label: 'Nível 3' },
+  { min: 3500,    title: '🏅 Veterano',            label: 'Nível 4' },
+  { min: 7000,    title: '🥇 Caçador',             label: 'Nível 5' },
+  { min: 12000,   title: '💎 Elite',               label: 'Nível 6' },
+  { min: 20000,   title: '👑 Mestre',              label: 'Nível 7' },
+  { min: 30000,   title: '🌟 Lendário',            label: 'Nível 8' },
+  { min: 50000,   title: '✦ Platina Supremo',      label: 'Nível 9' },
+  { min: 75000,   title: '🔥 Imortal',             label: 'Nível 10' },
+  { min: 100000,  title: '⚡ Titã',               label: 'Nível 11' },
+  { min: 150000,  title: '👁️ Celestial',           label: 'Nível 12' },
+  { min: 250000,  title: '🌌 Cosmico',            label: 'Nível 13' },
+  { min: 500000,  title: '💫 Conquistador Divino!', label: 'Nível 14' },
 ];
 
 function getLevel(xp: number) {
@@ -59,6 +64,7 @@ const ProfileView: React.FC = () => {
   const removePerfectGame = useAppStore((s) => s.removePerfectGame);
   const [selectingFeatured, setSelectingFeatured] = React.useState(false);
   const [selectingPerfect, setSelectingPerfect] = React.useState(false);
+  const [showLevelsModal, setShowLevelsModal] = React.useState(false);
 
   const featured = useMemo(
     () => {
@@ -126,6 +132,7 @@ const ProfileView: React.FC = () => {
 
           {/* Level badge */}
           <div
+            onClick={() => setShowLevelsModal(true)}
             style={{
               background: 'var(--bg3)',
               border: '1px solid var(--b3)',
@@ -133,7 +140,10 @@ const ProfileView: React.FC = () => {
               padding: '12px 18px',
               textAlign: 'center',
               minWidth: 120,
+              cursor: 'pointer',
+              transition: 'border-color 0.2s',
             }}
+            className="level-badge"
           >
             <div style={{ fontSize: 11, color: 'var(--txt3)', letterSpacing: 2 }}>
               {level.label}
@@ -538,6 +548,143 @@ const ProfileView: React.FC = () => {
             );
           })()}
         </section>
+
+        {/* ── Levels Modal ── */}
+        {showLevelsModal && (
+          <div
+            onClick={() => setShowLevelsModal(false)}
+            style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(0,0,0,0.8)',
+              backdropFilter: 'blur(4px)',
+              zIndex: 1000,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: 20,
+            }}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                background: 'var(--bg1)',
+                border: '1px solid var(--b2)',
+                borderRadius: 16,
+                padding: '24px 32px',
+                maxWidth: 500,
+                width: '100%',
+                maxHeight: '80vh',
+                overflowY: 'auto',
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                <h2 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>🏆 Todos os Níveis</h2>
+                <button
+                  onClick={() => setShowLevelsModal(false)}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    fontSize: 24,
+                    color: 'var(--txt2)',
+                    cursor: 'pointer',
+                    padding: '0 8px',
+                  }}
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* XP Explanation */}
+              <div style={{ marginBottom: 20, padding: '16px', background: 'var(--bg2)', borderRadius: 12, border: '1px solid var(--b2)' }}>
+                <h3 style={{ fontSize: 14, fontWeight: 700, margin: '0 0 12px 0', color: 'var(--accent)' }}>💡 Como ganhar XP</h3>
+                <div style={{ fontSize: 12, color: 'var(--txt2)', lineHeight: 1.6 }}>
+                  <div style={{ display: 'flex', gap: 8, marginBottom: 6 }}>
+                    <span>🏆</span>
+                    <span><strong>Conquista desbloqueada:</strong> +10 XP</span>
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, marginBottom: 6 }}>
+                    <span>🥉</span>
+                    <span><strong>Jogo Bronze</strong> (1-25%): +15 XP</span>
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, marginBottom: 6 }}>
+                    <span>🥈</span>
+                    <span><strong>Jogo Prata</strong> (26-50%): +50 XP</span>
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, marginBottom: 6 }}>
+                    <span>🥇</span>
+                    <span><strong>Jogo Ouro</strong> (51-75%): +150 XP</span>
+                  </div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <span>💎</span>
+                    <span><strong>Conquista Platinado</strong> (100%): +500 XP</span>
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {LEVELS.map((lvl, idx) => {
+                  const isCurrent = level.label === lvl.label;
+                  const isUnlocked = xp >= lvl.min;
+                  return (
+                    <div
+                      key={lvl.label}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 16,
+                        padding: '14px 16px',
+                        borderRadius: 10,
+                        background: isCurrent ? 'var(--accent)' : isUnlocked ? 'var(--bg3)' : 'transparent',
+                        border: '1px solid',
+                        borderColor: isCurrent ? 'var(--accent)' : isUnlocked ? 'var(--b3)' : 'var(--b1)',
+                        opacity: isUnlocked ? 1 : 0.5,
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: 40,
+                          height: 40,
+                          borderRadius: '50%',
+                          background: isCurrent ? '#fff' : isUnlocked ? 'var(--accent)' : 'var(--bg2)',
+                          color: isCurrent ? 'var(--accent)' : '#fff',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontWeight: 700,
+                          fontSize: 16,
+                        }}
+                      >
+                        {idx + 1}
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: 600, fontSize: 16, color: isCurrent ? '#fff' : 'var(--txt1)' }}>
+                          {lvl.title}
+                        </div>
+                        <div style={{ fontSize: 12, color: isCurrent ? 'rgba(255,255,255,0.8)' : 'var(--txt2)', marginTop: 2 }}>
+                          Mínimo: {lvl.min.toLocaleString('pt-BR')} XP
+                        </div>
+                      </div>
+                      {isCurrent && (
+                        <div style={{ fontSize: 12, color: '#fff', fontWeight: 600 }}>
+                          ATUAL
+                        </div>
+                      )}
+                      {!isUnlocked && (
+                        <div style={{ fontSize: 12, color: 'var(--txt3)' }}>
+                          🔒
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              <div style={{ marginTop: 20, padding: '12px 16px', background: 'var(--bg2)', borderRadius: 8, fontSize: 12, color: 'var(--txt2)', textAlign: 'center' }}>
+                Você tem {xp.toLocaleString('pt-BR')} XP
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

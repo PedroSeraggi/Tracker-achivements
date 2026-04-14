@@ -1,7 +1,6 @@
 import React, { useMemo } from 'react';
 import {
   useAppStore,
-  selectActiveGame,
   selectSearchActiveGame,
 } from '../../store/useAppStore';
 import { Avatar, FilterBar } from '../ui';
@@ -23,8 +22,9 @@ interface CompareRow {
 }
 
 const CompareView: React.FC = () => {
-  const myGame       = useAppStore(selectActiveGame);
   const theirGame    = useAppStore(selectSearchActiveGame);
+  // Find my game with the same appId as their game
+  const myGame       = useAppStore((s) => s.games.find((g) => g.appId === s.searchActiveGameAppId));
   const compareFilter  = useAppStore((s) => s.compareFilter);
   const setCompareFilter = useAppStore((s) => s.setCompareFilter);
   const setSearchView  = useAppStore((s) => s.setSearchView);

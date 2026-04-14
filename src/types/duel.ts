@@ -57,3 +57,13 @@ export interface RarityTier {
 export type RarityName = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary' | 'mythic';
 
 export type RarityStats = Record<RarityName, number>;
+
+// Saved deck type
+export interface SavedDeck {
+  id: string;
+  name: string;
+  cards: TrophyCard[];
+  gameIds: number[];
+  createdAt: string;
+  updatedAt: string;
+}

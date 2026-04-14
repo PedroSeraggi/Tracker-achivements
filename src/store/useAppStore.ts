@@ -16,6 +16,7 @@ import type {
   Toast,
   ToastKind,
 } from '../types';
+import type { SavedDeck, TrophyCard } from '../types/duel';
 
 // ─── State shape ───────────────────────────────────────────────────────────────
 interface AppState {
@@ -56,6 +57,11 @@ interface AppState {
 
   // ── Compare
   compareFilter: CompareFilter;
+
+  // ── Duel / Saved Decks
+  savedDecks: SavedDeck[];
+  duelView: 'duel' | 'my-decks' | 'view-deck';
+  viewingSavedDeckId: string | null;
 
   // ── Game Library modal
   libraryOpen: boolean;
@@ -129,6 +135,13 @@ interface AppState {
   // Search loading
   setSearchLoading: (v: boolean) => void;
 
+  // Saved deck actions
+  saveDeck: (name: string, cards: TrophyCard[], gameIds: number[]) => void;
+  deleteDeck: (id: string) => void;
+  updateDeck: (id: string, patch: Partial<SavedDeck>) => void;
+  setDuelView: (view: 'duel' | 'my-decks' | 'view-deck') => void;
+  viewSavedDeck: (id: string | null) => void;
+
   // Auth actions
   logout: () => void;
 }
@@ -163,6 +176,9 @@ export const useAppStore = create<AppState>()(
         searchActiveGameAppId: null,
         searchView: 'home',
         compareFilter: 'all',
+        savedDecks: [],
+        duelView: 'duel',
+        viewingSavedDeckId: null,
         libraryOpen: false,
         toasts: [],
         searchLoading: false,
@@ -314,6 +330,33 @@ export const useAppStore = create<AppState>()(
         // ── Compare
         setCompareFilter: (compareFilter) => set({ compareFilter }),
 
+        // ── Saved Decks
+        saveDeck: (name, cards, gameIds) =>
+          set((s) => {
+            const now = new Date().toISOString();
+            const newDeck: SavedDeck = {
+              id: `deck-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+              name,
+              cards,
+              gameIds,
+              createdAt: now,
+              updatedAt: now,
+            };
+            return { savedDecks: [...s.savedDecks, newDeck] };
+          }),
+        deleteDeck: (id) =>
+          set((s) => ({
+            savedDecks: s.savedDecks.filter((d) => d.id !== id),
+          })),
+        updateDeck: (id, patch) =>
+          set((s) => ({
+            savedDecks: s.savedDecks.map((d) =>
+              d.id === id ? { ...d, ...patch, updatedAt: new Date().toISOString() } : d
+            ),
+          })),
+        setDuelView: (duelView) => set({ duelView }),
+        viewSavedDeck: (viewingSavedDeckId) => set({ viewingSavedDeckId, duelView: viewingSavedDeckId ? 'view-deck' : 'my-decks' }),
+
         // ── Library
         setLibraryOpen: (libraryOpen) => set({ libraryOpen }),
 
@@ -334,8 +377,8 @@ export const useAppStore = create<AppState>()(
       }),
       {
         name: 'steam-tracker-storage',
-        // Only persist guides and featured/perfect games locally; auth/games come from server
-        partialize: (s) => ({ guides: s.guides, featuredGameIds: s.featuredGameIds, perfectGameIds: s.perfectGameIds }),
+        // Only persist guides, featured/perfect games, and saved decks locally; auth/games come from server
+        partialize: (s) => ({ guides: s.guides, featuredGameIds: s.featuredGameIds, perfectGameIds: s.perfectGameIds, savedDecks: s.savedDecks }),
       }
     )
   )
