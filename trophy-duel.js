@@ -259,6 +259,7 @@ const DuelUI = (() => {
           <div class="card-body">
             <div class="card-ach-name">${esc(card.displayName)}</div>
             <div class="card-game-name">${esc(card.gameName)}</div>
+            <div class="card-ach-desc">${esc(card.description || '')}</div>
           </div>
           <div class="card-footer">
             <span class="card-unlock-pct">${esc(pctDisplay)}</span>
