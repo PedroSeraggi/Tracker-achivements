@@ -1007,7 +1007,13 @@ function showView(v) {
   }
   if (v === 'profile') renderProfile();
   if (v === 'guides')  { populateGuideFilters(); renderGuidesList(); }
+
+
+
+  
 }
+
+
 
 // ══════════════════════════════════════════════════════════
 //  PROFILE RENDER

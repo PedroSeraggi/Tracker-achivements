@@ -447,6 +447,8 @@ app.get('/api/compare/:targetSteamId/:appid', requireAuth, async (req, res) => {
   }
 });
 
+
+
 // ══════════════════════════════════════════════════════════
 //  INICIAR SERVIDOR
 // ══════════════════════════════════════════════════════════
@@ -456,3 +458,4 @@ app.listen(PORT, () => {
   console.log(`   Acesse: ${BASE_URL}`);
   console.log(`   Para logar com a Steam: ${BASE_URL}/auth/steam\n`);
 });
+
