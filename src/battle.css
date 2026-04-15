@@ -1,19 +1,30 @@
 /* =============================================================
-   battle.css
-   Hearthstone-style battle UI for Trophy Duel.
-   Import once in main.tsx:  import './styles/battle.css';
+   battle.css  (v2)
+   Hearthstone-style battle UI para Trophy Duel.
+   Import em main.tsx:  import './styles/battle.css';
+
+   CORREÇÃO PRINCIPAL:
+     A mão do jogador estava sobrepondo o tabuleiro porque
+     .hs-battle não tinha altura definida e o flex: 1 da arena
+     não funcionava. Agora usamos CSS Grid com linhas explícitas:
+       header (auto) | bot (auto) | arena (1fr) | player (auto)
    ============================================================= */
 
-/* ─── Layout ──────────────────────────────────────────────── */
+/* ─── Layout raiz ─────────────────────────────────────────── */
 
+/*
+ * .hs-battle usa CSS Grid com 4 linhas.
+ * A linha da arena (1fr) absorve o espaço disponível,
+ * empurrando a mão do jogador para baixo de verdade.
+ */
 .hs-battle {
-  display       : flex;
-  flex-direction: column;
-  min-height    : 100%;
-  padding       : 0 0 20px;
-  gap           : 0;
-  /* Dark felt-like background */
-  background    : radial-gradient(ellipse at 50% 30%, #0d2235 0%, #080f18 100%);
+  display             : grid;
+  grid-template-rows  : auto auto 1fr auto;
+  /* "preenche" a área de conteúdo do dashboard */
+  height              : calc(100vh - 170px);
+  min-height          : 520px;
+  overflow            : hidden;
+  background          : radial-gradient(ellipse at 50% 20%, #0d2235 0%, #080f18 100%);
 }
 
 /* ─── Header / HUD ────────────────────────────────────────── */
@@ -22,27 +33,25 @@
   display        : flex;
   align-items    : center;
   justify-content: space-between;
-  padding        : 16px 20px;
-  background     : rgba(0,0,0,0.45);
+  padding        : 12px 20px;
+  background     : rgba(0,0,0,0.5);
   border-bottom  : 1px solid rgba(255,255,255,0.06);
   gap            : 12px;
+  flex-shrink    : 0;
 }
 
-.hs-hud-block {
-  text-align: center;
-  min-width : 64px;
-}
+.hs-hud-block   { text-align: center; min-width: 60px; }
 
 .hs-hud-label {
   font-size     : 10px;
   color         : var(--txt3, #556677);
   letter-spacing: 1.5px;
   text-transform: uppercase;
-  margin-bottom : 4px;
+  margin-bottom : 3px;
 }
 
 .hs-hud-val {
-  font-size  : 22px;
+  font-size  : 20px;
   font-weight: 900;
   color      : #fff;
   line-height: 1;
@@ -66,15 +75,15 @@
   color    : var(--txt3, #556677);
 }
 
-/* Timer with SVG ring */
+/* Timer ring */
 .hs-hud-timer {
-  position : relative;
-  width    : 48px;
-  height   : 48px;
-  display  : flex;
-  align-items: center;
+  position       : relative;
+  width          : 48px;
+  height         : 48px;
+  display        : flex;
+  align-items    : center;
   justify-content: center;
-  margin   : 0 auto;
+  margin         : 0 auto;
 }
 
 .hs-timer-ring {
@@ -84,18 +93,19 @@
   height  : 100%;
 }
 
-/* ─── Bot Zone ────────────────────────────────────────────── */
+/* ─── Bot Zone (linha 2 do grid) ──────────────────────────── */
 
 .hs-bot-zone {
-  padding   : 16px 20px 8px;
-  text-align: center;
+  padding        : 10px 16px 6px;
+  text-align     : center;
+  flex-shrink    : 0;
 }
 
 .hs-bot-zone-label {
   font-size     : 12px;
   color         : var(--txt2, #8899aa);
-  margin-bottom : 12px;
-  letter-spacing: 0.5px;
+  margin-bottom : 8px;
+  letter-spacing: 0.3px;
 }
 
 .hs-bot-thinking {
@@ -108,288 +118,399 @@
   50%       { opacity: 0.4; }
 }
 
-/* Bot hand — mirrored fan at top */
 .hs-bot-hand {
   display        : flex;
   align-items    : flex-end;
   justify-content: center;
-  height         : 80px;
+  height         : 72px;
   position       : relative;
-  perspective    : 800px;
+  overflow       : visible;
+  perspective    : 600px;
 }
 
 .hs-bot-card {
-  position       : absolute;
-  width          : 56px;
-  height         : 76px;
+  position        : absolute;
+  width           : 56px;
+  height          : 76px;
   transform-origin: bottom center;
-  transform      :
-    rotate(var(--rotate, 0deg))
-    translateY(calc(-1 * var(--drop, 0px)));
-  transition     : transform 0.2s ease;
-  left           : 50%;
-  margin-left    : -28px;
+  transform       : rotate(var(--rotate, 0deg)) translateY(var(--drop, 0px));
+  transition      : transform 0.2s ease;
+  left            : 50%;
 }
 
 .hs-bot-card-inner {
-  width        : 100%;
-  height       : 100%;
-  border-radius: 8px;
-  background   : linear-gradient(135deg, #1a2844, #0f1928);
-  border       : 1px solid rgba(255,255,255,0.1);
-  display      : flex;
-  align-items  : center;
+  width          : 100%;
+  height         : 100%;
+  border-radius  : 8px;
+  background     : linear-gradient(135deg, #1a2844, #0f1928);
+  border         : 1px solid rgba(255,255,255,0.1);
+  display        : flex;
+  align-items    : center;
   justify-content: center;
-  font-size    : 22px;
-  box-shadow   : 0 4px 12px rgba(0,0,0,0.5);
+  box-shadow     : 0 4px 12px rgba(0,0,0,0.5);
 }
 
-.hs-bot-card-back {
-  opacity: 0.6;
-}
+.hs-bot-card-back { opacity: 0.6; font-size: 22px; }
 
-/* ─── Arena ───────────────────────────────────────────────── */
+/* ─── Arena (linha 3 do grid — expande) ──────────────────── */
 
 .hs-arena {
-  flex       : 1;
-  display    : flex;
-  align-items: center;
+  display        : flex;
+  align-items    : center;
   justify-content: center;
-  padding    : 16px 20px;
-  min-height : 160px;
+  padding        : 8px 16px;
+  overflow       : hidden;
+  /* Gradiente sutil de tabuleiro */
+  background     : linear-gradient(
+    180deg,
+    rgba(58, 122, 204, 0.04) 0%,
+    rgba(58, 122, 204, 0.02) 100%
+  );
+  border-top     : 1px solid rgba(58, 122, 204, 0.1);
+  border-bottom  : 1px solid rgba(58, 122, 204, 0.1);
 }
 
-.hs-arena-empty {
-  font-size : 14px;
-  color     : var(--txt3, #556677);
-  text-align: center;
-  padding   : 24px;
-  border    : 2px dashed rgba(255,255,255,0.08);
-  border-radius: 16px;
-  width     : 100%;
-  max-width : 480px;
+.hs-arena-hint {
+  font-size    : 13px;
+  color        : var(--txt3, #556677);
+  text-align   : center;
+  padding      : 16px 24px;
+  border       : 2px dashed rgba(255,255,255,0.07);
+  border-radius: 14px;
+  max-width    : 420px;
 }
 
-.hs-arena-row {
+/* Arena ao vivo (durante seleção) */
+.hs-arena-live {
   display    : flex;
   align-items: center;
-  justify-content: center;
-  gap        : 24px;
-  flex-wrap  : wrap;
+  gap        : 16px;
   width      : 100%;
+  max-width  : 640px;
+}
+
+.hs-arena-live-side {
+  flex          : 1;
+  display       : flex;
+  flex-direction: column;
+  align-items   : center;
+  gap           : 6px;
+  min-width     : 0;
+}
+
+.hs-arena-live-label {
+  font-size     : 11px;
+  color         : var(--txt2, #8899aa);
+  letter-spacing: 0.5px;
+  text-align    : center;
+}
+
+.hs-arena-live-cards {
+  display  : flex;
+  gap      : 6px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.hs-arena-slot-empty {
+  width          : 110px;
+  height         : 70px;
+  border         : 2px dashed rgba(255,255,255,0.1);
+  border-radius  : 10px;
+  display        : flex;
+  align-items    : center;
+  justify-content: center;
+  font-size      : 12px;
+  color          : var(--txt3, #556677);
 }
 
 .hs-arena-vs {
-  font-size  : 24px;
+  font-size  : 22px;
   font-weight: 900;
-  color      : rgba(255,255,255,0.3);
+  color      : rgba(255,255,255,0.25);
+  flex-shrink: 0;
 }
 
-.hs-arena-slot {
-  width        : 180px;
-  height       : 100px;
-  border       : 2px dashed rgba(255,255,255,0.12);
-  border-radius: 12px;
-  display      : flex;
-  flex-direction: column;
-  align-items  : center;
-  justify-content: center;
-  gap          : 6px;
-}
-
-.hs-arena-slot-label {
-  font-size: 11px;
-  color    : var(--txt3, #556677);
-  letter-spacing: 1px;
-  text-transform: uppercase;
-}
-
-.hs-arena-slot-hint {
-  font-size: 12px;
-  color    : var(--txt3, #556677);
-  animation: hs-pulse 1.5s ease-in-out infinite;
-}
-
-/* Arena card (played card display) */
+/* Arena card compacta */
 .hs-arena-card {
   position     : relative;
-  width        : 180px;
-  border-radius: 12px;
+  width        : 110px;
+  border-radius: 10px;
   overflow     : hidden;
   border       : 2px solid var(--rarity-color, #9ca3af);
-  animation    : hs-card-enter 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both;
-  box-shadow   : 0 8px 24px rgba(0,0,0,0.5),
-                 0 0 20px color-mix(in srgb, var(--rarity-color, #9ca3af) 30%, transparent);
+  animation    : hs-card-enter 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  box-shadow   : 0 6px 20px rgba(0,0,0,0.5),
+                 0 0 16px color-mix(in srgb, var(--rarity-color, #9ca3af) 25%, transparent);
 }
 
 .hs-arena-card--winner {
-  box-shadow: 0 8px 40px rgba(0,0,0,0.5),
-              0 0 40px color-mix(in srgb, var(--rarity-color, #9ca3af) 60%, transparent);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5),
+              0 0 32px color-mix(in srgb, var(--rarity-color, #9ca3af) 55%, transparent);
 }
 
 .hs-arena-winner-glow {
-  position     : absolute;
-  inset        : 0;
-  border       : 3px solid var(--rarity-color, #fff);
-  border-radius: 10px;
+  position      : absolute;
+  inset         : 0;
+  border        : 3px solid var(--rarity-color, #fff);
+  border-radius : 8px;
   pointer-events: none;
-  animation    : hs-winner-pulse 0.6s ease-in-out infinite alternate;
+  animation     : hs-winner-pulse 0.6s ease-in-out infinite alternate;
 }
 
 @keyframes hs-winner-pulse {
-  from { opacity: 0.4; }
+  from { opacity: 0.35; }
   to   { opacity: 1; }
 }
 
 .hs-arena-card-inner {
   display: flex;
-  height : 100px;
+  height : 80px;
 }
 
 .hs-arena-card-info {
-  flex   : 1;
-  padding: 8px 10px;
-  display: flex;
+  flex          : 1;
+  padding       : 6px 8px;
+  display       : flex;
   flex-direction: column;
   justify-content: center;
-  gap   : 3px;
-  background: rgba(0,0,0,0.35);
-}
-
-.hs-arena-card-label {
-  font-size     : 9px;
-  color         : var(--txt3, #556677);
-  text-transform: uppercase;
-  letter-spacing: 1.5px;
+  gap           : 3px;
+  background    : rgba(0,0,0,0.35);
+  min-width     : 0;
 }
 
 .hs-arena-card-damage {
-  font-size  : 20px;
+  font-size  : 18px;
   font-weight: 900;
   color      : var(--rarity-color, #fff);
-  margin-top : 2px;
 }
 
 @keyframes hs-card-enter {
-  from {
-    opacity  : 0;
-    transform: translateY(-20px) scale(0.88);
-  }
-  to {
-    opacity  : 1;
-    transform: translateY(0)    scale(1);
-  }
+  from { opacity: 0; transform: translateY(-16px) scale(0.88); }
+  to   { opacity: 1; transform: translateY(0)    scale(1);    }
 }
 
-/* ─── Player Hand ─────────────────────────────────────────── */
+/* ─── Coluna de resultado (round-result) ─────────────────── */
+
+.hs-result-arena {
+  display    : flex;
+  align-items: flex-start;
+  gap        : 20px;
+  width      : 100%;
+  max-width  : 640px;
+  justify-content: center;
+}
+
+.hs-arena-column {
+  flex          : 1;
+  display       : flex;
+  flex-direction: column;
+  align-items   : center;
+  gap           : 8px;
+  min-width     : 0;
+}
+
+.hs-arena-column-label {
+  font-size     : 11px;
+  color         : var(--txt2, #8899aa);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.hs-arena-cards-row {
+  display  : flex;
+  gap      : 6px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.hs-arena-total {
+  font-size: 13px;
+  color    : var(--txt2, #8899aa);
+}
+
+/* ─── Player Zone (linha 4 do grid) ──────────────────────── */
 
 .hs-player-zone {
-  padding   : 8px 16px 0;
-  text-align: center;
+  flex-shrink    : 0;
+  background     : rgba(0,0,0,0.4);
+  border-top     : 1px solid rgba(255,255,255,0.06);
+  padding-bottom : 8px;
 }
 
-.hs-player-zone-label {
-  font-size    : 12px;
+/* Barra de ação: info + botão Pronto */
+.hs-ready-bar {
+  display        : flex;
+  align-items    : center;
+  justify-content: space-between;
+  padding        : 8px 16px 4px;
+  gap            : 12px;
+}
+
+.hs-ready-info {
+  display  : flex;
+  align-items: center;
+  gap      : 12px;
+  font-size: 13px;
+  color    : var(--txt2, #8899aa);
+}
+
+.hs-draw-preview {
+  font-size    : 11px;
+  color        : var(--txt3, #556677);
+  padding      : 3px 8px;
+  background   : var(--bg3, #0f1923);
+  border-radius: 4px;
+  border       : 1px solid var(--b2, #223344);
+}
+
+/* Botão Pronto */
+.hs-btn-ready {
+  padding      : 8px 20px;
+  background   : var(--bg3, #0f1923);
+  border       : 1px solid var(--b2, #223344);
+  border-radius: 8px;
   color        : var(--txt2, #8899aa);
-  margin-bottom: 4px;
+  font-size    : 13px;
+  font-weight  : 600;
+  cursor       : pointer;
+  transition   : all 0.2s;
+  white-space  : nowrap;
+  flex-shrink  : 0;
 }
 
+.hs-btn-ready:hover {
+  border-color: var(--txt2, #8899aa);
+  color       : #fff;
+}
+
+/* Pronto com cartas selecionadas → destaque dourado */
+.hs-btn-ready--active {
+  background   : linear-gradient(135deg, #fbbf24, #f59e0b);
+  border-color : #fbbf24;
+  color        : #000;
+  font-weight  : 800;
+  box-shadow   : 0 4px 16px rgba(251,191,36,0.4);
+}
+
+.hs-btn-ready--active:hover {
+  opacity  : 0.9;
+  transform: translateY(-1px);
+  color    : #000;
+}
+
+/* Mão de cartas em leque */
 .hs-player-hand {
   display        : flex;
   align-items    : flex-end;
   justify-content: center;
-  height         : 200px;
+  /*
+   * CORREÇÃO: altura suficiente para cartas + hover lift
+   * O overflow:visible garante que cards não ficam cortados
+   * mas também não descem para cima do tabuleiro.
+   */
+  height         : 210px;
   position       : relative;
-  perspective    : 900px;
   overflow       : visible;
+  perspective    : 900px;
+  /* Empurra a mão para baixo sem deixar espaço extra acima */
+  padding-bottom : 4px;
 }
 
-/* ─── Hand Card ───────────────────────────────────────────── */
+/* ─── Carta na mão ────────────────────────────────────────── */
 
 .hs-hand-card {
-  position       : absolute;
-  width          : var(--card-width, 140px);
-  height         : var(--card-height, 210px);
+  position        : absolute;
+  width           : var(--card-width, 140px);
+  height          : var(--card-height, 210px);
   transform-origin: bottom center;
-  /* Fan positioning: rotate + lower edge cards */
-  transform      :
+  transform       :
     rotate(var(--rotate, 0deg))
     translateY(var(--drop, 0px));
-  transition     :
-    transform     0.22s cubic-bezier(0.34, 1.4, 0.64, 1),
-    z-index       0s,
-    filter        0.2s;
-  cursor         : pointer;
-  z-index        : 1;
-  /* Stagger the positioning horizontally */
-  left           : 50%;
-  margin-left    : calc(-1 * var(--card-width, 140px) / 2);
+  transition      :
+    transform  0.22s cubic-bezier(0.34, 1.4, 0.64, 1),
+    filter     0.2s;
+  cursor          : pointer;
+  /* As cartas precisam de bottom: 0 para ancorarem na base */
+  bottom          : 0;
 }
 
-/* Override horizontal position via inline JS — handled by JS below */
-
-.hs-hand-card:hover,
-.hs-hand-card--hovered {
-  transform   : rotate(0deg) translateY(-40px) scale(1.12) !important;
-  z-index     : 20 !important;
-  filter      : drop-shadow(0 20px 30px rgba(0,0,0,0.7));
+/* Hover: levantar e endireitar */
+.hs-hand-card:hover:not(.hs-hand-card--dimmed):not(.hs-hand-card--selected) {
+  transform: rotate(0deg) translateY(-36px) scale(1.1) !important;
+  z-index  : 20 !important;
+  filter   : drop-shadow(0 16px 24px rgba(0,0,0,0.7));
 }
 
+/* Selecionada: ergue mais e fica estável */
 .hs-hand-card--selected {
-  transform   : rotate(0deg) translateY(-80px) scale(1.08) !important;
+  transform   : rotate(0deg) translateY(-52px) scale(1.06) !important;
   z-index     : 30 !important;
-  filter      : drop-shadow(0 30px 50px rgba(255,255,255,0.3));
-  pointer-events: none;
+  filter      : drop-shadow(0 20px 40px rgba(255,255,255,0.25))
+                brightness(1.08);
+  cursor      : pointer; /* ainda clicável para desselecionar */
 }
 
-.hs-hand-card--playing {
-  animation   : hs-play-card 0.4s cubic-bezier(0.22, 1, 0.36, 1) forwards !important;
-  z-index     : 50 !important;
-  pointer-events: none;
-}
-
-@keyframes hs-play-card {
-  to {
-    transform: translateY(-200px) scale(0.9);
-    opacity  : 0;
-  }
-}
-
+/* Dimmed: outras cartas quando máximo atingido */
 .hs-hand-card--dimmed {
-  filter  : brightness(0.55) saturate(0.5);
-  cursor  : default;
+  filter    : brightness(0.5) saturate(0.4);
+  cursor    : default;
+  transform : rotate(var(--rotate, 0deg)) translateY(var(--drop, 0px)) !important;
 }
 
 /* ── Card inner ── */
 
 .hs-card-inner {
-  width        : 100%;
-  height       : 100%;
-  border-radius: var(--card-radius, 14px);
-  overflow     : hidden;
-  background   : var(--bg2, #1a2332);
-  border       : 2px solid transparent;
-  display      : flex;
+  width         : 100%;
+  height        : 100%;
+  border-radius : var(--card-radius, 14px);
+  overflow      : hidden;
+  background    : var(--bg2, #1a2332);
+  border        : 2px solid transparent;
+  display       : flex;
   flex-direction: column;
-  position     : relative;
-  transition   : border-color 0.2s, box-shadow 0.2s;
+  position      : relative;
+  transition    : border-color 0.2s, box-shadow 0.2s;
 }
 
-/* Rarity borders */
-.hs-card-inner[data-rarity="common"]    { border-color: #9ca3af; box-shadow: 0 4px 12px rgba(156,163,175,0.2); }
-.hs-card-inner[data-rarity="uncommon"]  { border-color: #4ade80; box-shadow: 0 4px 14px rgba(74,222,128,0.25); }
-.hs-card-inner[data-rarity="rare"]      { border-color: #60a5fa; box-shadow: 0 4px 16px rgba(96,165,250,0.3); }
+/* Bordas por raridade */
+.hs-card-inner[data-rarity="common"]    { border-color: #9ca3af; box-shadow: 0 4px 12px rgba(156,163,175,0.2);  }
+.hs-card-inner[data-rarity="uncommon"]  { border-color: #4ade80; box-shadow: 0 4px 14px rgba(74,222,128,0.25);  }
+.hs-card-inner[data-rarity="rare"]      { border-color: #60a5fa; box-shadow: 0 4px 16px rgba(96,165,250,0.3);   }
 .hs-card-inner[data-rarity="epic"]      { border-color: #c084fc; box-shadow: 0 4px 18px rgba(192,132,252,0.35); }
-.hs-card-inner[data-rarity="legendary"] { border-color: #fbbf24; box-shadow: 0 6px 24px rgba(251,191,36,0.45); }
-.hs-card-inner[data-rarity="mythic"]    { border-color: #f472b6; box-shadow: 0 8px 28px rgba(244,114,182,0.5); }
+.hs-card-inner[data-rarity="legendary"] { border-color: #fbbf24; box-shadow: 0 6px 24px rgba(251,191,36,0.45);  }
+.hs-card-inner[data-rarity="mythic"]    { border-color: #f472b6; box-shadow: 0 8px 28px rgba(244,114,182,0.5);  }
 
-/* Shine on hover for legendary / mythic */
-.hs-hand-card--hovered .hs-card-inner[data-rarity="legendary"],
-.hs-hand-card--hovered .hs-card-inner[data-rarity="mythic"] {
-  box-shadow: 0 16px 48px color-mix(in srgb, var(--rarity-color) 60%, transparent);
+/* ── Badge de custo ── */
+.hs-card-cost {
+  position       : absolute;
+  top            : 6px;
+  left           : 6px;
+  z-index        : 3;
+  width          : 20px;
+  height         : 20px;
+  border-radius  : 50%;
+  display        : flex;
+  align-items    : center;
+  justify-content: center;
+  font-size      : 11px;
+  font-weight    : 900;
+  color          : #000;
+  box-shadow     : 0 2px 6px rgba(0,0,0,0.5);
+  line-height    : 1;
 }
 
-/* ── Art area (reused from trophy-duel.css) ── */
+/* ── Badge de ordem de seleção ── */
+.hs-card-sel-order {
+  position : absolute;
+  top      : 6px;
+  right    : 6px;
+  z-index  : 4;
+  font-size: 16px;
+  line-height: 1;
+  filter   : drop-shadow(0 2px 4px rgba(0,0,0,0.6));
+}
+
+/* ── Arte ── */
 .hs-card-art {
   position: relative;
   flex    : 0 0 110px;
@@ -406,16 +527,16 @@
 }
 
 .hs-card-art-icon {
-  position : absolute;
-  top      : 50%;
-  left     : 50%;
-  transform: translate(-50%, -50%);
-  width    : 58px;
-  height   : 58px;
+  position     : absolute;
+  top          : 50%;
+  left         : 50%;
+  transform    : translate(-50%, -50%);
+  width        : 58px;
+  height       : 58px;
   border-radius: 8px;
-  object-fit: contain;
-  filter   : drop-shadow(0 4px 10px rgba(0,0,0,0.6));
-  z-index  : 1;
+  object-fit   : contain;
+  filter       : drop-shadow(0 4px 10px rgba(0,0,0,0.6));
+  z-index      : 1;
 }
 
 .hs-card-art-emoji {
@@ -423,33 +544,31 @@
   top            : 50%;
   left           : 50%;
   transform      : translate(-50%, -50%);
-  font-size      : 36px;
+  font-size      : 32px;
   z-index        : 1;
   display        : flex;
   align-items    : center;
   justify-content: center;
-  width          : 58px;
-  height         : 58px;
+  width          : 54px;
+  height         : 54px;
   border-radius  : 10px;
   background     : rgba(0,0,0,0.4);
   border         : 2px solid var(--rarity-color, #9ca3af);
-  box-shadow     : 0 4px 16px color-mix(in srgb, var(--rarity-color, #9ca3af) 35%, transparent);
 }
 
 .hs-card-rarity-badge {
   position      : absolute;
   top           : 6px;
-  left          : 6px;
+  left          : 30px; /* deslocado para não sobrepor badge de custo */
   z-index       : 2;
   background    : rgba(0,0,0,0.72);
   border-radius : 4px;
   padding       : 2px 6px;
-  font-size     : 8px;
+  font-size      : 8px;
   font-weight   : 700;
-  letter-spacing: 1.2px;
+  letter-spacing: 1px;
   text-transform: uppercase;
-  color         : var(--rarity-color, #9ca3af);
-  border        : 1px solid var(--rarity-color, #9ca3af);
+  border        : 1px solid currentColor;
 }
 
 .hs-card-game-thumb {
@@ -471,21 +590,39 @@
   display   : block;
 }
 
-/* ── Card body ── */
+/* Shine para legendary/mythic */
+.hs-card-inner[data-rarity="legendary"] .hs-card-art::after,
+.hs-card-inner[data-rarity="mythic"]    .hs-card-art::after {
+  content        : '';
+  position       : absolute;
+  inset          : 0;
+  background     : linear-gradient(115deg, transparent 30%, rgba(255,255,255,0.07) 50%, transparent 70%);
+  background-size: 200% 100%;
+  animation      : card-shine 3s linear infinite;
+  pointer-events : none;
+  z-index        : 3;
+}
+
+@keyframes card-shine {
+  0%   { background-position:  200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ── Corpo ── */
 .hs-card-body {
-  flex   : 1;
-  padding: 8px 10px;
-  display: flex;
+  flex          : 1;
+  padding       : 8px 10px;
+  display       : flex;
   flex-direction: column;
-  gap    : 3px;
-  background: linear-gradient(180deg, rgba(0,0,0,0.25) 0%, transparent 100%);
+  gap           : 3px;
+  background    : linear-gradient(180deg, rgba(0,0,0,0.2) 0%, transparent 100%);
 }
 
 .hs-card-name {
-  font-size  : 11px;
-  font-weight: 700;
-  color      : #fff;
-  line-height: 1.3;
+  font-size          : 11px;
+  font-weight        : 700;
+  color              : #fff;
+  line-height        : 1.3;
   display            : -webkit-box;
   -webkit-line-clamp : 2;
   line-clamp         : 2;
@@ -501,9 +638,9 @@
   text-overflow: ellipsis;
 }
 
-/* ── Card footer ── */
+/* ── Rodapé ── */
 .hs-card-footer {
-  padding        : 6px 10px 8px;
+  padding        : 5px 10px 7px;
   display        : flex;
   align-items    : center;
   justify-content: space-between;
@@ -514,33 +651,31 @@
   font-size: 9px;
   color    : var(--txt3, #556677);
 }
-
 .hs-card-pct::before { content: '👥 '; font-size: 8px; }
 
 .hs-card-damage {
   display    : flex;
   align-items: center;
   gap        : 3px;
-  font-size  : 15px;
+  font-size  : 14px;
   font-weight: 900;
-  color      : var(--rarity-color, #9ca3af);
 }
 
-/* ── Selection overlay (inside card, no external element) ── */
+/* ── Overlay de seleção DENTRO da carta ── */
 .hs-card-selected-overlay {
-  position     : absolute;
-  inset        : 0;
-  border-radius: calc(var(--card-radius, 14px) - 2px);
-  border       : 3px solid #fff;
-  box-shadow   : inset 0 0 20px rgba(255,255,255,0.25),
-                 0 0 30px rgba(255,255,255,0.4);
+  position      : absolute;
+  inset         : 0;
+  border-radius : calc(var(--card-radius, 14px) - 2px);
+  border        : 3px solid rgba(255,255,255,0.9);
+  box-shadow    : inset 0 0 16px rgba(255,255,255,0.2),
+                  0 0 24px rgba(255,255,255,0.3);
   pointer-events: none;
-  z-index      : 10;
-  animation    : hs-select-glow 0.5s ease;
+  z-index       : 10;
+  animation     : hs-select-in 0.25s ease;
 }
 
-@keyframes hs-select-glow {
-  from { opacity: 0; transform: scale(1.05); }
+@keyframes hs-select-in {
+  from { opacity: 0; transform: scale(1.04); }
   to   { opacity: 1; transform: scale(1); }
 }
 
@@ -550,62 +685,34 @@
   display       : flex;
   flex-direction: column;
   align-items   : center;
-  padding       : 32px 20px;
-  gap           : 20px;
-}
-
-.hs-round-result-header {
-  display       : flex;
-  flex-direction: column;
-  align-items   : center;
-  gap           : 12px;
+  padding       : 28px 20px 32px;
+  gap           : 18px;
+  background    : radial-gradient(ellipse at 50% 20%, #0d2235 0%, #080f18 100%);
+  min-height    : calc(100vh - 170px);
 }
 
 .hs-round-result-title {
-  font-size  : 20px;
+  font-size  : 18px;
   font-weight: 700;
   color      : #fff;
+  text-align : center;
+  max-width  : 540px;
 }
 
 .hs-scoreboard {
-  display    : flex;
-  align-items: center;
-  gap        : 16px;
-  padding    : 12px 24px;
-  background : var(--bg2, #1a2332);
-  border     : 1px solid var(--b2, #223344);
+  display      : flex;
+  align-items  : center;
+  gap          : 20px;
+  padding      : 12px 28px;
+  background   : var(--bg2, #1a2332);
+  border       : 1px solid var(--b2, #223344);
   border-radius: 12px;
 }
 
-.hs-scoreboard-side {
-  display    : flex;
-  align-items: center;
-  gap        : 8px;
-}
-
-.hs-scoreboard-label {
-  font-size: 12px;
-  color    : var(--txt3, #556677);
-}
-
-.hs-scoreboard-num {
-  font-size  : 26px;
-  font-weight: 900;
-}
-
-.hs-scoreboard-vs {
-  font-size: 16px;
-  color    : var(--txt3, #556677);
-}
-
-.hs-draw-badge {
-  padding      : 8px 20px;
-  background   : rgba(255,255,255,0.06);
-  border       : 1px solid rgba(255,255,255,0.12);
-  border-radius: 8px;
-  font-size    : 13px;
-  color        : var(--txt2, #8899aa);
-}
+.hs-scoreboard-side { display: flex; align-items: center; gap: 10px; }
+.hs-scoreboard-label { font-size: 12px; color: var(--txt3, #556677); }
+.hs-scoreboard-num   { font-size: 28px; font-weight: 900; }
+.hs-scoreboard-vs    { font-size: 16px; color: var(--txt3, #556677); }
 
 /* ─── Game Over ───────────────────────────────────────────── */
 
@@ -617,31 +724,33 @@
   padding       : 60px 20px;
   gap           : 16px;
   text-align    : center;
+  background    : radial-gradient(ellipse at 50% 30%, #0d2235 0%, #080f18 100%);
+  min-height    : calc(100vh - 170px);
 }
 
-.hs-gameover-icon  { font-size: 80px; }
-.hs-gameover-title { font-size: 32px; font-weight: 800; margin: 0; }
-.hs-gameover-sub   { font-size: 15px; color: var(--txt2, #8899aa); margin: 0; max-width: 360px; }
+.hs-gameover-icon  { font-size: 72px; }
+.hs-gameover-title { font-size: 30px; font-weight: 800; margin: 0; }
+.hs-gameover-sub   { font-size: 14px; color: var(--txt2, #8899aa); margin: 0; max-width: 340px; }
 
 .hs-gameover-score {
-  display    : flex;
-  align-items: center;
-  gap        : 32px;
-  padding    : 20px 48px;
-  background : var(--bg2, #1a2332);
-  border     : 1px solid var(--b2, #223344);
+  display      : flex;
+  align-items  : center;
+  gap          : 32px;
+  padding      : 18px 44px;
+  background   : var(--bg2, #1a2332);
+  border       : 1px solid var(--b2, #223344);
   border-radius: 14px;
 }
 
-.hs-gameover-score-side { text-align: center; }
-.hs-gameover-score-label { font-size: 12px; color: var(--txt3, #556677); }
-.hs-gameover-score-num { font-size: 36px; font-weight: 900; }
-.hs-gameover-score-vs { font-size: 20px; color: var(--txt3, #556677); }
+.hs-gameover-score-side  { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.hs-gameover-score-label { font-size: 11px; color: var(--txt3, #556677); }
+.hs-gameover-score-num   { font-size: 36px; font-weight: 900; }
+.hs-gameover-score-vs    { font-size: 20px; color: var(--txt3, #556677); }
 
-/* ─── Button ──────────────────────────────────────────────── */
+/* ─── Botão primário ──────────────────────────────────────── */
 
 .hs-btn-primary {
-  padding      : 13px 36px;
+  padding      : 12px 32px;
   background   : var(--accent, #3a7acc);
   border       : none;
   border-radius: 10px;
@@ -657,35 +766,15 @@
   transform: translateY(-2px);
 }
 
-/* ─── Toast ───────────────────────────────────────────────── */
-
-.hs-played-toast {
-  position      : fixed;
-  bottom        : 24px;
-  left          : 50%;
-  transform     : translateX(-50%);
-  padding       : 11px 24px;
-  background    : var(--accent, #3a7acc);
-  border-radius : 8px;
-  color         : #fff;
-  font-weight   : 600;
-  font-size     : 14px;
-  z-index       : 200;
-  animation     : hs-toast-in 0.3s ease;
-  pointer-events: none;
-  white-space   : nowrap;
-}
-
-@keyframes hs-toast-in {
-  from { opacity: 0; transform: translateX(-50%) translateY(12px); }
-  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
-}
-
 /* ─── Responsive ──────────────────────────────────────────── */
 
-@media (max-width: 600px) {
+@media (max-width: 640px) {
+  .hs-battle {
+    height: calc(100vh - 140px);
+  }
+
   .hs-player-hand {
-    height: 160px;
+    height: 175px;
   }
 
   .hs-hand-card {
@@ -693,16 +782,16 @@
     --card-height: 165px;
   }
 
-  .hs-arena-row {
-    gap: 12px;
-  }
-
   .hs-arena-card {
-    width: 140px;
+    width: 90px;
   }
 
-  .hs-gameover-score {
-    gap    : 20px;
-    padding: 16px 28px;
+  .hs-arena-live {
+    gap: 8px;
+  }
+
+  .hs-ready-bar {
+    flex-wrap: wrap;
+    gap      : 8px;
   }
 }

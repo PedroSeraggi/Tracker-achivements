@@ -1,66 +1,84 @@
+// ─────────────────────────────────────────────────────────────────────────────
+//  src/components/duel/DuelBattle.tsx  (v2)
+//
+//  Novidades:
+//    - Seleção de até 3 cartas com badge de ordem (①②③)
+//    - Botão "Pronto" sempre visível, mostra quantas cartas selecionadas
+//    - Badge de custo em cada carta (base na raridade)
+//    - Arena mostra até 3 cartas de cada lado com total de dano
+//    - Layout corrigido: hand fica na base, arena cresce no meio
+//    - Bot hand: cartas viradas com arco espelhado
+// ─────────────────────────────────────────────────────────────────────────────
 
-
-import React, { useEffect, useCallback, useState } from 'react';
-import { useBattleStore } from '../../store/useBattleStore';
-import type { TrophyCard } from '../../types/duel';
+import React, { useEffect, useCallback } from 'react';
+import { useBattleStore, getCardCost } from '../../store/useBattleStore';
 import { useFanLayout } from '../../hooks/useFanLayout';
+import type { TrophyCard } from '../../types/duel';
 
-// ─── Sub-component: card in fan hand ─────────────────────────────────────────
+// ─── Cores de raridade ────────────────────────────────────────────────────────
+
+const RARITY_COLOR: Record<string, string> = {
+  common   : '#9ca3af',
+  uncommon : '#4ade80',
+  rare     : '#60a5fa',
+  epic     : '#c084fc',
+  legendary: '#fbbf24',
+  mythic   : '#f472b6',
+};
+
+// ─── Sub: carta na mão do jogador ────────────────────────────────────────────
 
 interface HandCardProps {
-  card        : TrophyCard;
-  index       : number;
-  total       : number;
-  fanStyle    : Record<string, string | number>;
-  isSelected  : boolean;
-  canSelect   : boolean;
-  isPlaying   : boolean;  
-  onSelect    : () => void;
+  card       : TrophyCard;
+  index      : number;
+  total      : number;
+  fanStyle   : Record<string, string | number>;
+  selOrder   : number;  // 0 = não selecionada, 1/2/3 = ordem de seleção
+  canSelect  : boolean;
+  canDeselect: boolean;
+  onToggle   : () => void;
 }
 
 const HandCard: React.FC<HandCardProps> = ({
-  card, index, total, fanStyle, isSelected, canSelect, isPlaying, onSelect,
+  card, fanStyle, selOrder, canSelect, canDeselect, onToggle,
 }) => {
-  const [hovered, setHovered] = useState(false);
-
-  const pctDisplay = card.globalPercent != null
-    ? `${card.globalPercent.toFixed(1)}%`
-    : '??%';
-
-  const RARITY_COLORS: Record<string, string> = {
-    common   : '#9ca3af',
-    uncommon : '#4ade80',
-    rare     : '#60a5fa',
-    epic     : '#c084fc',
-    legendary: '#fbbf24',
-    mythic   : '#f472b6',
-  };
-  const rarityColor = RARITY_COLORS[card.rarity] ?? '#9ca3af';
+  const isSelected  = selOrder > 0;
+  const cost        = getCardCost(card.rarity);
+  const rarityColor = RARITY_COLOR[card.rarity] ?? '#9ca3af';
+  const pctDisplay  = card.globalPercent != null ? `${card.globalPercent.toFixed(1)}%` : '??%';
+  const clickable   = (canSelect && !isSelected) || (canDeselect && isSelected);
 
   return (
     <div
       className={[
         'hs-hand-card',
-        hovered && canSelect ? 'hs-hand-card--hovered' : '',
         isSelected ? 'hs-hand-card--selected' : '',
-        isPlaying  ? 'hs-hand-card--playing'  : '',
-        !canSelect && !isSelected ? 'hs-hand-card--dimmed' : '',
+        !clickable  ? 'hs-hand-card--dimmed' : '',
       ].filter(Boolean).join(' ')}
       style={{
         ...fanStyle,
         '--rarity-color': rarityColor,
-        cursor: canSelect ? 'pointer' : 'default',
+        cursor: clickable ? 'pointer' : 'default',
         marginLeft: `calc(-1 * var(--card-width, 140px) / 2)`,
       } as React.CSSProperties}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      onClick={() => canSelect && onSelect()}
+      onClick={() => clickable && onToggle()}
       title={card.description || card.name}
     >
-      {/* Card inner */}
       <div className="hs-card-inner" data-rarity={card.rarity}>
 
-        {/* Art area */}
+        {/* Badge de custo — canto superior esquerdo */}
+        <div className="hs-card-cost" style={{ background: rarityColor }}>
+          {cost}
+        </div>
+
+        {/* Badge de ordem de seleção — canto superior direito */}
+        {isSelected && (
+          <div className="hs-card-sel-order">
+            {selOrder === 1 ? '①' : selOrder === 2 ? '②' : '③'}
+          </div>
+        )}
+
+        {/* Arte */}
         <div className="hs-card-art">
           <div
             className="hs-card-art-bg"
@@ -75,85 +93,87 @@ const HandCard: React.FC<HandCardProps> = ({
               onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
             />
           ) : (
-            <div className="hs-card-art-emoji">{card.rarityEmoji}</div>
+            <div className="hs-card-art-emoji" style={{ borderColor: rarityColor }}>
+              {card.rarityEmoji}
+            </div>
           )}
-          <div className="hs-card-rarity-badge">{card.rarityLabel}</div>
+          <div className="hs-card-rarity-badge" style={{ color: rarityColor, borderColor: rarityColor }}>
+            {card.rarityLabel}
+          </div>
           <div className="hs-card-game-thumb">
             <img
-              src={card.gameHeaderUrl}
-              alt={card.gameName}
-              loading="lazy"
-              onError={(e) => { (e.target as HTMLImageElement).parentElement!.style.display = 'none'; }}
+              src={card.gameHeaderUrl} alt={card.gameName} loading="lazy"
+              onError={(e) => { const p = (e.target as HTMLImageElement).parentElement; if (p) p.style.display = 'none'; }}
             />
           </div>
         </div>
 
-        {/* Body */}
+        {/* Corpo */}
         <div className="hs-card-body">
           <div className="hs-card-name">{card.name}</div>
           <div className="hs-card-game">{card.gameName}</div>
         </div>
 
-        {/* Footer */}
+        {/* Rodapé */}
         <div className="hs-card-footer">
           <span className="hs-card-pct">{pctDisplay}</span>
-          <div className="hs-card-damage">
+          <div className="hs-card-damage" style={{ color: rarityColor }}>
             <span>⚔</span>
             <strong>{card.damage}</strong>
           </div>
         </div>
 
-        {/* Selection indicator — inside the card, no border mismatch */}
-        {isSelected && (
-          <div className="hs-card-selected-overlay" />
-        )}
+        {/* Overlay de seleção — dentro da carta para evitar desalinhamento */}
+        {isSelected && <div className="hs-card-selected-overlay" />}
       </div>
     </div>
   );
 };
 
-// ─── Sub-component: arena slot ───────────────────────────────────────────────
+// ─── Sub: carta do bot (virada) ───────────────────────────────────────────────
 
-const ArenaCard: React.FC<{ card: TrophyCard | null; label: string; isWinner?: boolean }> = ({
-  card, label, isWinner,
-}) => {
-  const RARITY_COLORS: Record<string, string> = {
-    common   : '#9ca3af',
-    uncommon : '#4ade80',
-    rare     : '#60a5fa',
-    epic     : '#c084fc',
-    legendary: '#fbbf24',
-    mythic   : '#f472b6',
-  };
+const BotFaceDown: React.FC<{ fanStyle: Record<string, string | number> }> = ({ fanStyle }) => (
+  <div
+    className="hs-bot-card"
+    style={{ ...fanStyle, marginLeft: 'calc(-1 * 28px)' } as React.CSSProperties}
+  >
+    <div className="hs-bot-card-inner">
+      <div className="hs-bot-card-back">🤖</div>
+    </div>
+  </div>
+);
 
-  if (!card) {
-    return (
-      <div className="hs-arena-slot hs-arena-slot--empty">
-        <div className="hs-arena-slot-label">{label}</div>
-        <div className="hs-arena-slot-hint">aguardando…</div>
-      </div>
-    );
-  }
+// ─── Sub: carta na arena ──────────────────────────────────────────────────────
 
+const ArenaCard: React.FC<{
+  card     : TrophyCard;
+  isWinner?: boolean;
+  delay    ?: number;
+}> = ({ card, isWinner, delay = 0 }) => {
+  const rarityColor = RARITY_COLOR[card.rarity] ?? '#9ca3af';
   return (
-    <div className={`hs-arena-card ${isWinner ? 'hs-arena-card--winner' : ''}`}
-         data-rarity={card.rarity}
-         style={{ '--rarity-color': RARITY_COLORS[card.rarity] } as React.CSSProperties}>
+    <div
+      className={`hs-arena-card${isWinner ? ' hs-arena-card--winner' : ''}`}
+      data-rarity={card.rarity}
+      style={{
+        '--rarity-color'   : rarityColor,
+        animationDelay     : `${delay}s`,
+      } as React.CSSProperties}
+    >
       <div className="hs-arena-card-inner">
-        <div className="hs-card-art" style={{ flex: '0 0 90px' }}>
-          <div className="hs-card-art-bg"
-               style={{ backgroundImage: `url('${card.iconUrl || card.gameHeaderUrl}')` }} />
+        <div className="hs-card-art" style={{ flex: '0 0 80px', minHeight: 80 }}>
+          <div className="hs-card-art-bg" style={{ backgroundImage: `url('${card.iconUrl || card.gameHeaderUrl}')` }} />
           {card.iconUrl ? (
             <img className="hs-card-art-icon" src={card.iconUrl} alt={card.name} loading="lazy"
+                 style={{ width: 44, height: 44 }}
                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
           ) : (
-            <div className="hs-card-art-emoji">{card.rarityEmoji}</div>
+            <div className="hs-card-art-emoji" style={{ fontSize: 28, borderColor: rarityColor }}>{card.rarityEmoji}</div>
           )}
         </div>
         <div className="hs-arena-card-info">
-          <div className="hs-arena-card-label">{label}</div>
-          <div className="hs-card-name" style={{ fontSize: 12 }}>{card.name}</div>
-          <div className="hs-arena-card-damage">⚔ {card.damage}</div>
+          <div className="hs-card-name" style={{ fontSize: 11 }}>{card.name}</div>
+          <div className="hs-arena-card-damage" style={{ color: rarityColor }}>⚔ {card.damage}</div>
         </div>
       </div>
       {isWinner && <div className="hs-arena-winner-glow" />}
@@ -161,65 +181,99 @@ const ArenaCard: React.FC<{ card: TrophyCard | null; label: string; isWinner?: b
   );
 };
 
-// ─── Sub-component: face-down bot card ───────────────────────────────────────
+// ─── Sub: coluna de arena (até 3 cartas) ──────────────────────────────────────
 
-const BotFaceDown: React.FC<{ index: number; total: number; fanStyle: Record<string, string | number> }> = ({ fanStyle }) => {
-  return (
-    <div
-      className="hs-bot-card"
-      style={fanStyle as React.CSSProperties}
-    >
-      <div className="hs-bot-card-inner">
-        <div className="hs-bot-card-back">🤖</div>
+const ArenaColumn: React.FC<{
+  cards    : TrophyCard[];
+  total    : number;
+  isWinner?: boolean;
+  label    : string;
+  isEmpty  ?: boolean;
+  waiting  ?: boolean;
+}> = ({ cards, total, isWinner, label, isEmpty, waiting }) => (
+  <div className="hs-arena-column">
+    <div className="hs-arena-column-label">{label}</div>
+    {isEmpty || cards.length === 0 ? (
+      <div className="hs-arena-slot-empty">
+        {waiting ? <span className="hs-bot-thinking">⏳ escolhendo…</span> : 'aguardando'}
       </div>
-    </div>
-  );
-};
+    ) : (
+      <>
+        <div className="hs-arena-cards-row">
+          {cards.map((c, i) => (
+            <ArenaCard key={c.id} card={c} isWinner={isWinner} delay={i * 0.08} />
+          ))}
+        </div>
+        <div className="hs-arena-total" style={{ color: isWinner ? '#4ade80' : 'var(--txt2)' }}>
+          Total: <strong>{total}</strong>
+          {isWinner && ' 🏆'}
+        </div>
+      </>
+    )}
+  </div>
+);
 
-// ─── Main component ───────────────────────────────────────────────────────────
+// ─── Componente principal ─────────────────────────────────────────────────────
 
 const DuelBattle: React.FC = () => {
   const {
     phase, playerHand, botHand,
     playerScore, botScore, round,
-    selectedPlayerCard, selectedBotCard,
-    roundWinner, gameWinner, timeLeft, isTimerRunning,
-    playingCard,
-    selectCard, botPlay, resolveRound, nextRound, resetBattle, tickTimer,
+    selectedPlayerCards, selectedBotCards,
+    roundWinner, gameWinner,
+    timeLeft, isTimerRunning, isPlayerReady,
+    toggleCard, pressReady, botPlay, resolveRound, nextRound, resetBattle, tickTimer,
   } = useBattleStore();
 
-  // ── Timer ──────────────────────────────────────────────────────────────
+  // ── Fan layouts ──────────────────────────────────────────────────────────
+  const playerFan = useFanLayout(playerHand.length, 140, 18);
+  const botFan    = useFanLayout(botHand.length,    56,  8);
+
+  // ── Timer ────────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!isTimerRunning) return;
     const id = setInterval(tickTimer, 1000);
     return () => clearInterval(id);
   }, [isTimerRunning, tickTimer]);
 
-  // ── Bot plays when player has chosen ──────────────────────────────────
+  // ── Bot joga após player confirmar ───────────────────────────────────────
   useEffect(() => {
-    if (phase === 'battle' && selectedPlayerCard && !selectedBotCard) {
-      const t = setTimeout(botPlay, 600);
+    if (phase === 'battle' && isPlayerReady && selectedBotCards.length === 0) {
+      const t = setTimeout(() => { botPlay(); }, 500);
       return () => clearTimeout(t);
     }
-  }, [phase, selectedPlayerCard, selectedBotCard, botPlay]);
+  }, [phase, isPlayerReady, selectedBotCards.length, botPlay]);
 
-  // ── Resolve when both cards chosen ────────────────────────────────────
+  // ── Resolve quando ambos têm cartas ou player passou sem cartas ──────────
   useEffect(() => {
-    if (phase === 'battle' && selectedPlayerCard && selectedBotCard) {
-      const t = setTimeout(resolveRound, 900);
+    if (
+      phase === 'battle' &&
+      isPlayerReady &&
+      selectedBotCards.length > 0
+    ) {
+      const t = setTimeout(() => { resolveRound(); }, 900);
       return () => clearTimeout(t);
     }
-  }, [phase, selectedPlayerCard, selectedBotCard, resolveRound]);
+  }, [phase, isPlayerReady, selectedBotCards.length, resolveRound]);
 
-  const handleSelect = useCallback((card: TrophyCard) => {
-    selectCard(card);
-  }, [selectCard]);
+  const handleToggle = useCallback((card: TrophyCard) => {
+    toggleCard(card);
+  }, [toggleCard]);
 
-  // ── Fan layouts (must be before early returns) ───────────────────────────
-  const playerFan = useFanLayout(playerHand.length, 140, 18);
-  const botFan    = useFanLayout(botHand.length,    56,  8);
+  // ── Somas de dano ────────────────────────────────────────────────────────
+  const playerTotal = selectedPlayerCards.reduce((s, c) => s + c.damage, 0);
+  const botTotal    = selectedBotCards.reduce((s, c) => s + c.damage, 0);
 
-  // ── Game Over ──────────────────────────────────────────────────────────
+  // ── Timer visual ─────────────────────────────────────────────────────────
+  const timerPct   = (timeLeft / 30) * 100;
+  const timerColor = timeLeft <= 5 ? '#f87171' : timeLeft <= 10 ? '#fbbf24' : '#4ade80';
+
+  // ── Quantas cartas comprar no próximo turno ──────────────────────────────
+  const nextDraw = 4 - selectedPlayerCards.length;
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // GAME OVER
+  // ──────────────────────────────────────────────────────────────────────────
   if (phase === 'game-over') {
     const won = gameWinner === 'player';
     return (
@@ -235,27 +289,23 @@ const DuelBattle: React.FC = () => {
         </p>
         <div className="hs-gameover-score">
           <div className="hs-gameover-score-side">
-            <div className="hs-gameover-score-label">Você</div>
-            <div className="hs-gameover-score-num" style={{ color: won ? '#4ade80' : 'var(--txt)' }}>
-              {playerScore}
-            </div>
+            <span className="hs-gameover-score-label">Você</span>
+            <span className="hs-gameover-score-num" style={{ color: won ? '#4ade80' : 'var(--txt)' }}>{playerScore}</span>
           </div>
-          <div className="hs-gameover-score-vs">VS</div>
+          <span className="hs-gameover-score-vs">VS</span>
           <div className="hs-gameover-score-side">
-            <div className="hs-gameover-score-label">Bot</div>
-            <div className="hs-gameover-score-num" style={{ color: !won ? '#f87171' : 'var(--txt)' }}>
-              {botScore}
-            </div>
+            <span className="hs-gameover-score-label">Bot</span>
+            <span className="hs-gameover-score-num" style={{ color: !won ? '#f87171' : 'var(--txt)' }}>{botScore}</span>
           </div>
         </div>
-        <button className="hs-btn-primary" onClick={resetBattle}>
-          🔄 Jogar Novamente
-        </button>
+        <button className="hs-btn-primary" onClick={resetBattle}>🔄 Jogar Novamente</button>
       </div>
     );
   }
 
-  // ── Round Result ───────────────────────────────────────────────────────
+  // ──────────────────────────────────────────────────────────────────────────
+  // ROUND RESULT
+  // ──────────────────────────────────────────────────────────────────────────
   if (phase === 'round-result') {
     const playerWon = roundWinner === 'player';
     const botWon    = roundWinner === 'bot';
@@ -263,32 +313,44 @@ const DuelBattle: React.FC = () => {
 
     return (
       <div className="hs-round-result">
-        <div className="hs-round-result-header">
-          <div className="hs-round-result-title">
-            {isDraw ? '🤝 Empate!' : playerWon ? '✅ Você venceu o round!' : '❌ Bot venceu o round'}
+        {/* Título */}
+        <div className="hs-round-result-title">
+          {isDraw
+            ? '🤝 Empate! Dano igual — nenhum ponto!'
+            : playerWon
+            ? `✅ Você venceu o round! (+${playerTotal} vs ${botTotal})`
+            : `❌ Bot venceu o round (${playerTotal} vs +${botTotal})`}
+        </div>
+
+        {/* Placar */}
+        <div className="hs-scoreboard">
+          <div className="hs-scoreboard-side">
+            <span className="hs-scoreboard-label">Você</span>
+            <span className="hs-scoreboard-num" style={{ color: '#4ade80' }}>{playerScore}</span>
           </div>
-          <div className="hs-scoreboard">
-            <div className="hs-scoreboard-side">
-              <span className="hs-scoreboard-label">Você</span>
-              <span className="hs-scoreboard-num" style={{ color: '#4ade80' }}>{playerScore}</span>
-            </div>
-            <span className="hs-scoreboard-vs">vs</span>
-            <div className="hs-scoreboard-side">
-              <span className="hs-scoreboard-label">Bot</span>
-              <span className="hs-scoreboard-num" style={{ color: '#f87171' }}>{botScore}</span>
-            </div>
+          <span className="hs-scoreboard-vs">vs</span>
+          <div className="hs-scoreboard-side">
+            <span className="hs-scoreboard-label">Bot</span>
+            <span className="hs-scoreboard-num" style={{ color: '#f87171' }}>{botScore}</span>
           </div>
         </div>
 
-        <div className="hs-arena-row">
-          <ArenaCard card={selectedPlayerCard} label="Sua carta" isWinner={playerWon} />
+        {/* Cartas lado a lado */}
+        <div className="hs-result-arena">
+          <ArenaColumn
+            cards={selectedPlayerCards}
+            total={playerTotal}
+            isWinner={playerWon}
+            label="Suas cartas"
+          />
           <div className="hs-arena-vs">VS</div>
-          <ArenaCard card={selectedBotCard} label="Bot" isWinner={botWon} />
+          <ArenaColumn
+            cards={selectedBotCards}
+            total={botTotal}
+            isWinner={botWon}
+            label="Bot"
+          />
         </div>
-
-        {isDraw && (
-          <div className="hs-draw-badge">Dano igual — nenhum ponto!</div>
-        )}
 
         <button className="hs-btn-primary" onClick={nextRound}>
           Próximo Round →
@@ -297,20 +359,19 @@ const DuelBattle: React.FC = () => {
     );
   }
 
-  // ── Battle Phase ───────────────────────────────────────────────────────
-  const timerColor =
-    timeLeft <= 3 ? '#f87171' :
-    timeLeft <= 5 ? '#fbbf24' : '#4ade80';
-
+  // ──────────────────────────────────────────────────────────────────────────
+  // BATTLE PHASE
+  // ──────────────────────────────────────────────────────────────────────────
   return (
     <div className="hs-battle">
 
-      {/* ── Header: score + round + timer ── */}
+      {/* ── HUD ── */}
       <div className="hs-battle-header">
         <div className="hs-hud-block">
           <div className="hs-hud-label">Round</div>
           <div className="hs-hud-val">{round}</div>
         </div>
+
         <div className="hs-hud-score">
           <div className="hs-hud-score-side">
             <div className="hs-hud-label">Você</div>
@@ -322,19 +383,23 @@ const DuelBattle: React.FC = () => {
             <div className="hs-hud-val" style={{ color: '#f87171', fontSize: 28 }}>{botScore}</div>
           </div>
         </div>
+
+        {/* Timer ring */}
         <div className="hs-hud-block">
           <div className="hs-hud-label">Tempo</div>
-          <div className="hs-hud-val hs-hud-timer" style={{ color: timerColor }}>
-            {timeLeft}s
+          <div className="hs-hud-timer">
+            <span style={{ color: timerColor, fontWeight: 900, fontSize: 15, position: 'relative', zIndex: 1 }}>
+              {timeLeft}s
+            </span>
             <svg className="hs-timer-ring" viewBox="0 0 44 44">
-              <circle cx="22" cy="22" r="18" fill="none" stroke="var(--b2)" strokeWidth="3" />
+              <circle cx="22" cy="22" r="18" fill="none" stroke="var(--b2, #223344)" strokeWidth="3" />
               <circle
                 cx="22" cy="22" r="18"
                 fill="none"
                 stroke={timerColor}
                 strokeWidth="3"
                 strokeDasharray={`${2 * Math.PI * 18}`}
-                strokeDashoffset={`${2 * Math.PI * 18 * (1 - timeLeft / 10)}`}
+                strokeDashoffset={`${2 * Math.PI * 18 * (1 - timerPct / 100)}`}
                 strokeLinecap="round"
                 transform="rotate(-90 22 22)"
                 style={{ transition: 'stroke-dashoffset 1s linear, stroke 0.3s' }}
@@ -344,71 +409,111 @@ const DuelBattle: React.FC = () => {
         </div>
       </div>
 
-      {/* ── Bot zone (top) ── */}
+      {/* ── Bot zone ── */}
       <div className="hs-bot-zone">
         <div className="hs-bot-zone-label">
           🤖 Bot — {botHand.length} carta{botHand.length !== 1 ? 's' : ''}
-          {selectedPlayerCard && !selectedBotCard && (
+          {isPlayerReady && selectedBotCards.length === 0 && (
             <span className="hs-bot-thinking"> escolhendo…</span>
           )}
         </div>
         <div className="hs-bot-hand">
           {botHand.map((_, i) => (
-            <BotFaceDown key={i} index={i} total={botHand.length} fanStyle={botFan.getCardStyle(i)} />
+            <BotFaceDown key={i} fanStyle={botFan.getCardStyle(i)} />
           ))}
         </div>
       </div>
 
-      {/* ── Arena (center) ── */}
+      {/* ── Arena ── */}
       <div className="hs-arena">
-        {selectedPlayerCard || selectedBotCard ? (
-          <div className="hs-arena-row">
-            <ArenaCard card={selectedPlayerCard} label="Sua carta" />
+        {selectedPlayerCards.length > 0 || isPlayerReady ? (
+          <div className="hs-arena-live">
+            <div className="hs-arena-live-side">
+              <div className="hs-arena-live-label">Você · {playerTotal} ⚔</div>
+              <div className="hs-arena-live-cards">
+                {selectedPlayerCards.map((c) => (
+                  <ArenaCard key={c.id} card={c} />
+                ))}
+              </div>
+            </div>
             <div className="hs-arena-vs">VS</div>
-            <ArenaCard card={selectedBotCard} label="Bot" />
+            <div className="hs-arena-live-side">
+              <div className="hs-arena-live-label">Bot</div>
+              <div className="hs-arena-live-cards">
+                {isPlayerReady && selectedBotCards.length === 0 ? (
+                  <div className="hs-arena-slot-empty">
+                    <span className="hs-bot-thinking">⏳</span>
+                  </div>
+                ) : (
+                  selectedBotCards.map((c) => <ArenaCard key={c.id} card={c} />)
+                )}
+              </div>
+            </div>
           </div>
         ) : (
-          <div className="hs-arena-empty">
-            {selectedPlayerCard
-              ? '✅ Carta jogada! Aguardando bot…'
-              : 'Escolha uma carta da sua mão'}
+          <div className="hs-arena-hint">
+            Selecione cartas da sua mão e clique em <strong>Pronto</strong>
           </div>
         )}
       </div>
 
-      {/* ── Player hand (bottom) ── */}
+      {/* ── Player hand ── */}
       <div className="hs-player-zone">
-        <div className="hs-player-zone-label">
-          🎴 Sua mão — {playerHand.length} carta{playerHand.length !== 1 ? 's' : ''}
-          {!selectedPlayerCard && (
-            <span style={{ fontSize: 11, color: 'var(--txt3)', marginLeft: 8 }}>
-              clique para jogar
-            </span>
+
+        {/* Barra de ação: info + botão Pronto */}
+        <div className="hs-ready-bar">
+          <div className="hs-ready-info">
+            {isPlayerReady ? (
+              <span style={{ color: '#4ade80' }}>✅ Aguardando bot…</span>
+            ) : (
+              <>
+                <span>
+                  {selectedPlayerCards.length}/{3} cartas
+                </span>
+                <span className="hs-draw-preview">
+                  → próx. turno: +{nextDraw} carta{nextDraw !== 1 ? 's' : ''}
+                </span>
+              </>
+            )}
+          </div>
+
+          {!isPlayerReady && (
+            <button
+              className={`hs-btn-ready ${selectedPlayerCards.length > 0 ? 'hs-btn-ready--active' : ''}`}
+              onClick={pressReady}
+            >
+              {selectedPlayerCards.length === 0
+                ? 'Passar turno'
+                : `Pronto (${selectedPlayerCards.length} carta${selectedPlayerCards.length > 1 ? 's' : ''})`}
+            </button>
           )}
         </div>
+
+        {/* Mão de cartas em leque */}
         <div className="hs-player-hand">
-          {playerHand.map((card, i) => (
-            <HandCard
-              key={card.id}
-              card={card}
-              index={i}
-              total={playerHand.length}
-              fanStyle={playerFan.getCardStyle(i)}
-              isSelected={selectedPlayerCard?.id === card.id}
-              isPlaying={playingCard?.id === card.id}
-              canSelect={!selectedPlayerCard && phase === 'battle'}
-              onSelect={() => handleSelect(card)}
-            />
-          ))}
+          {playerHand.map((card, i) => {
+            const selIdx = selectedPlayerCards.findIndex((c) => c.id === card.id);
+            const selOrder = selIdx >= 0 ? selIdx + 1 : 0;
+            const alreadySelected = selOrder > 0;
+            const maxReached = selectedPlayerCards.length >= 3;
+
+            return (
+              <HandCard
+                key={card.id}
+                card={card}
+                index={i}
+                total={playerHand.length}
+                fanStyle={playerFan.getCardStyle(i)}
+                selOrder={selOrder}
+                canSelect={!isPlayerReady && !alreadySelected && !maxReached}
+                canDeselect={!isPlayerReady && alreadySelected}
+                onToggle={() => handleToggle(card)}
+              />
+            );
+          })}
         </div>
       </div>
 
-      {/* ── Played card toast ── */}
-      {selectedPlayerCard && !selectedBotCard && (
-        <div className="hs-played-toast">
-          ✅ Carta jogada! Aguardando bot…
-        </div>
-      )}
     </div>
   );
 };
