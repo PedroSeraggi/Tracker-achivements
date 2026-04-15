@@ -112,6 +112,9 @@ const HandCard: React.FC<HandCardProps> = ({
         <div className="hs-card-body">
           <div className="hs-card-name">{card.name}</div>
           <div className="hs-card-game">{card.gameName}</div>
+          {card.description && (
+            <div className="hs-card-desc">{card.description}</div>
+          )}
         </div>
 
         {/* Rodapé */}
@@ -143,7 +146,7 @@ const BotFaceDown: React.FC<{ fanStyle: Record<string, string | number> }> = ({ 
   </div>
 );
 
-// ─── Sub: carta na arena ──────────────────────────────────────────────────────
+// ─── Sub: carta na arena (formato completo miniatura) ─────────────────────────
 
 const ArenaCard: React.FC<{
   card     : TrophyCard;
@@ -151,31 +154,77 @@ const ArenaCard: React.FC<{
   delay    ?: number;
 }> = ({ card, isWinner, delay = 0 }) => {
   const rarityColor = RARITY_COLOR[card.rarity] ?? '#9ca3af';
+  const cost = getCardCost(card.rarity);
+  const pctDisplay = card.globalPercent != null ? `${card.globalPercent.toFixed(1)}%` : '??%';
+
   return (
     <div
       className={`hs-arena-card${isWinner ? ' hs-arena-card--winner' : ''}`}
       data-rarity={card.rarity}
       style={{
-        '--rarity-color'   : rarityColor,
-        animationDelay     : `${delay}s`,
+        '--rarity-color': rarityColor,
+        animationDelay: `${delay}s`,
       } as React.CSSProperties}
+      title={card.description || card.name}
     >
-      <div className="hs-arena-card-inner">
-        <div className="hs-card-art" style={{ flex: '0 0 80px', minHeight: 80 }}>
-          <div className="hs-card-art-bg" style={{ backgroundImage: `url('${card.iconUrl || card.gameHeaderUrl}')` }} />
+      {/* Card miniatura - mesmo formato da mão */}
+      <div className="hs-card-mini" data-rarity={card.rarity}>
+        {/* Badge de custo */}
+        <div className="hs-card-mini-cost" style={{ background: rarityColor }}>
+          {cost}
+        </div>
+
+        {/* Arte */}
+        <div className="hs-card-mini-art">
+          <div
+            className="hs-card-mini-art-bg"
+            style={{ backgroundImage: `url('${card.iconUrl || card.gameHeaderUrl}')` }}
+          />
           {card.iconUrl ? (
-            <img className="hs-card-art-icon" src={card.iconUrl} alt={card.name} loading="lazy"
-                 style={{ width: 44, height: 44 }}
-                 onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+            <img
+              className="hs-card-mini-art-icon"
+              src={card.iconUrl}
+              alt={card.name}
+              loading="lazy"
+              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+            />
           ) : (
-            <div className="hs-card-art-emoji" style={{ fontSize: 28, borderColor: rarityColor }}>{card.rarityEmoji}</div>
+            <div className="hs-card-mini-art-emoji" style={{ borderColor: rarityColor }}>
+              {card.rarityEmoji}
+            </div>
+          )}
+          <div className="hs-card-mini-rarity" style={{ color: rarityColor, borderColor: rarityColor }}>
+            {card.rarityLabel}
+          </div>
+          <div className="hs-card-mini-thumb">
+            <img
+              src={card.gameHeaderUrl}
+              alt={card.gameName}
+              loading="lazy"
+              onError={(e) => { const p = (e.target as HTMLImageElement).parentElement; if (p) p.style.display = 'none'; }}
+            />
+          </div>
+        </div>
+
+        {/* Corpo */}
+        <div className="hs-card-mini-body">
+          <div className="hs-card-mini-name">{card.name}</div>
+          <div className="hs-card-mini-game">{card.gameName}</div>
+          {card.description && (
+            <div className="hs-card-mini-desc">{card.description}</div>
           )}
         </div>
-        <div className="hs-arena-card-info">
-          <div className="hs-card-name" style={{ fontSize: 11 }}>{card.name}</div>
-          <div className="hs-arena-card-damage" style={{ color: rarityColor }}>⚔ {card.damage}</div>
+
+        {/* Footer */}
+        <div className="hs-card-mini-footer">
+          <span className="hs-card-mini-pct">{pctDisplay}</span>
+          <div className="hs-card-mini-damage">
+            <span>⚔</span>
+            <strong>{card.damage}</strong>
+          </div>
         </div>
       </div>
+
       {isWinner && <div className="hs-arena-winner-glow" />}
     </div>
   );

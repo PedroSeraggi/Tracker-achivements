@@ -158,16 +158,17 @@
   display        : flex;
   align-items    : center;
   justify-content: center;
-  padding        : 8px 16px;
-  overflow       : hidden;
+  padding        : 20px 24px;
+  overflow       : visible;
+  min-height     : 260px;
   /* Gradiente sutil de tabuleiro */
   background     : linear-gradient(
     180deg,
-    rgba(58, 122, 204, 0.04) 0%,
-    rgba(58, 122, 204, 0.02) 100%
+    rgba(58, 122, 204, 0.08) 0%,
+    rgba(58, 122, 204, 0.04) 100%
   );
-  border-top     : 1px solid rgba(58, 122, 204, 0.1);
-  border-bottom  : 1px solid rgba(58, 122, 204, 0.1);
+  border-top     : 1px solid rgba(58, 122, 204, 0.15);
+  border-bottom  : 1px solid rgba(58, 122, 204, 0.15);
 }
 
 .hs-arena-hint {
@@ -183,19 +184,20 @@
 /* Arena ao vivo (durante seleção) */
 .hs-arena-live {
   display    : flex;
-  align-items: center;
-  gap        : 16px;
+  align-items: flex-start;
+  gap        : 40px;
   width      : 100%;
-  max-width  : 640px;
+  max-width  : 900px;
+  padding    : 0 20px;
 }
 
 .hs-arena-live-side {
-  flex          : 1;
+  flex          : 0 0 auto;
   display       : flex;
   flex-direction: column;
   align-items   : center;
-  gap           : 6px;
-  min-width     : 0;
+  gap           : 8px;
+  min-width     : 460px;
 }
 
 .hs-arena-live-label {
@@ -206,41 +208,45 @@
 }
 
 .hs-arena-live-cards {
-  display  : flex;
-  gap      : 6px;
-  flex-wrap: wrap;
+  display       : flex;
+  flex-direction: row;
+  gap           : 12px;
+  flex-wrap     : nowrap;
+  align-items   : flex-start;
   justify-content: center;
 }
 
 .hs-arena-slot-empty {
-  width          : 110px;
-  height         : 70px;
+  width          : 140px;
+  height         : 210px;
   border         : 2px dashed rgba(255,255,255,0.1);
-  border-radius  : 10px;
+  border-radius  : 12px;
   display        : flex;
   align-items    : center;
   justify-content: center;
-  font-size      : 12px;
+  font-size      : 14px;
   color          : var(--txt3, #556677);
 }
 
 .hs-arena-vs {
-  font-size  : 22px;
+  font-size  : 24px;
   font-weight: 900;
-  color      : rgba(255,255,255,0.25);
+  color      : rgba(255,255,255,0.3);
   flex-shrink: 0;
+  padding    : 0 10px;
+  margin-top : 80px;
 }
 
-/* Arena card compacta */
+/* Arena card - tamanho normal igual à mão */
 .hs-arena-card {
   position     : relative;
-  width        : 110px;
-  border-radius: 10px;
-  overflow     : hidden;
-  border       : 2px solid var(--rarity-color, #9ca3af);
+  width        : 140px;
+  height       : 210px;
+  border-radius: 12px;
+  overflow     : visible;
   animation    : hs-card-enter 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) both;
-  box-shadow   : 0 6px 20px rgba(0,0,0,0.5),
-                 0 0 16px color-mix(in srgb, var(--rarity-color, #9ca3af) 25%, transparent);
+  box-shadow   : 0 8px 30px rgba(0,0,0,0.6),
+                 0 0 20px color-mix(in srgb, var(--rarity-color, #9ca3af) 30%, transparent);
 }
 
 .hs-arena-card--winner {
@@ -250,11 +256,12 @@
 
 .hs-arena-winner-glow {
   position      : absolute;
-  inset         : 0;
-  border        : 3px solid var(--rarity-color, #fff);
-  border-radius : 8px;
+  inset         : -4px;
+  border        : 4px solid var(--rarity-color, #fff);
+  border-radius : 14px;
   pointer-events: none;
   animation     : hs-winner-pulse 0.6s ease-in-out infinite alternate;
+  box-shadow    : 0 0 30px var(--rarity-color, #fff);
 }
 
 @keyframes hs-winner-pulse {
@@ -262,26 +269,170 @@
   to   { opacity: 1; }
 }
 
-.hs-arena-card-inner {
-  display: flex;
-  height : 80px;
-}
-
-.hs-arena-card-info {
-  flex          : 1;
-  padding       : 6px 8px;
-  display       : flex;
+/* Card na arena - formato completo tamanho normal (igual à mão) */
+.hs-card-mini {
+  width        : 100%;
+  height       : 100%;
+  background   : linear-gradient(180deg, #1a2634 0%, #0d1b26 100%);
+  border       : 2px solid var(--rarity-color, #9ca3af);
+  border-radius: 8px;
+  display      : flex;
   flex-direction: column;
-  justify-content: center;
-  gap           : 3px;
-  background    : rgba(0,0,0,0.35);
-  min-width     : 0;
+  position     : relative;
+  overflow     : hidden;
 }
 
-.hs-arena-card-damage {
-  font-size  : 18px;
-  font-weight: 900;
+/* Cost badge */
+.hs-card-mini-cost {
+  position      : absolute;
+  top           : 6px;
+  left          : 6px;
+  width         : 26px;
+  height        : 26px;
+  border-radius : 50%;
+  display       : flex;
+  align-items   : center;
+  justify-content: center;
+  font-size     : 12px;
+  font-weight   : 800;
+  color         : #000;
+  z-index       : 10;
+}
+
+/* Art area */
+.hs-card-mini-art {
+  position   : relative;
+  height     : 80px;
+  overflow   : hidden;
+  flex-shrink: 0;
+}
+
+.hs-card-mini-art-bg {
+  position  : absolute;
+  inset     : 0;
+  background-size : cover;
+  background-position: center;
+  filter    : brightness(0.4) saturate(0.6);
+}
+
+.hs-card-mini-art-icon {
+  position  : absolute;
+  top       : 50%;
+  left      : 50%;
+  transform : translate(-50%, -50%);
+  width     : 48px;
+  height    : 48px;
+  object-fit: contain;
+  filter    : drop-shadow(0 2px 6px rgba(0,0,0,0.8));
+}
+
+.hs-card-mini-art-emoji {
+  position  : absolute;
+  top       : 50%;
+  left      : 50%;
+  transform : translate(-50%, -50%);
+  font-size : 36px;
+  border    : 2px solid;
+  border-radius: 50%;
+  width     : 48px;
+  height    : 48px;
+  display   : flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.hs-card-mini-rarity {
+  position  : absolute;
+  bottom    : 6px;
+  left      : 6px;
+  font-size : 10px;
+  font-weight: 700;
+  padding   : 2px 6px;
+  border    : 1px solid;
+  border-radius: 4px;
+  background: rgba(0,0,0,0.6);
+}
+
+.hs-card-mini-thumb {
+  position  : absolute;
+  bottom    : 6px;
+  right     : 6px;
+  width     : 44px;
+  height    : 20px;
+  border-radius: 3px;
+  overflow  : hidden;
+}
+
+.hs-card-mini-thumb img {
+  width     : 100%;
+  height    : 100%;
+  object-fit: cover;
+}
+
+/* Body */
+.hs-card-mini-body {
+  flex       : 1;
+  padding    : 8px 10px;
+  display    : flex;
+  flex-direction: column;
+  gap        : 4px;
+  min-height : 0;
+}
+
+.hs-card-mini-name {
+  font-size  : 12px;
+  font-weight: 700;
+  color      : #fff;
+  line-height: 1.3;
+  display    : -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp : 2;
+  -webkit-box-orient: vertical;
+  overflow   : hidden;
+}
+
+.hs-card-mini-game {
+  font-size  : 10px;
+  color      : var(--txt2, #8899aa);
+  white-space: nowrap;
+  overflow   : hidden;
+  text-overflow: ellipsis;
+}
+
+.hs-card-mini-desc {
+  font-size  : 9px;
+  color      : var(--txt3, #778899);
+  line-height: 1.3;
+  display    : -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp : 2;
+  -webkit-box-orient: vertical;
+  overflow   : hidden;
+  margin-top : 2px;
+}
+
+/* Footer */
+.hs-card-mini-footer {
+  display      : flex;
+  align-items  : center;
+  justify-content: space-between;
+  padding      : 6px 10px;
+  background   : rgba(0,0,0,0.4);
+  border-top   : 1px solid rgba(255,255,255,0.08);
+  font-size    : 12px;
+}
+
+.hs-card-mini-pct {
+  color: var(--txt2, #8899aa);
+}
+
+.hs-card-mini-damage {
+  display    : flex;
+  align-items: center;
+  gap        : 4px;
   color      : var(--rarity-color, #fff);
+  font-weight: 800;
+  font-size  : 14px;
 }
 
 @keyframes hs-card-enter {
@@ -294,19 +445,20 @@
 .hs-result-arena {
   display    : flex;
   align-items: flex-start;
-  gap        : 20px;
+  gap        : 40px;
   width      : 100%;
-  max-width  : 640px;
+  max-width  : 900px;
   justify-content: center;
+  padding    : 0 20px;
 }
 
 .hs-arena-column {
-  flex          : 1;
+  flex          : 0 0 auto;
   display       : flex;
   flex-direction: column;
   align-items   : center;
-  gap           : 8px;
-  min-width     : 0;
+  gap           : 10px;
+  min-width     : 460px;
 }
 
 .hs-arena-column-label {
@@ -317,9 +469,11 @@
 }
 
 .hs-arena-cards-row {
-  display  : flex;
-  gap      : 6px;
-  flex-wrap: wrap;
+  display       : flex;
+  flex-direction: row;
+  gap           : 16px;
+  flex-wrap     : nowrap;
+  align-items   : flex-start;
   justify-content: center;
 }
 
@@ -638,6 +792,18 @@
   text-overflow: ellipsis;
 }
 
+.hs-card-desc {
+  font-size  : 12px;
+  color      : var(--txt3, #7f90a1);
+  line-height: 1.3;
+  display    : -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp : 2;
+  -webkit-box-orient: vertical;
+  overflow   : hidden;
+  margin-top : 12px;
+}
+
 /* ── Rodapé ── */
 .hs-card-footer {
   padding        : 5px 10px 7px;
@@ -783,15 +949,84 @@
   }
 
   .hs-arena-card {
-    width: 90px;
+    width : 120px;
+    height: 180px;
+  }
+
+  .hs-card-mini-art {
+    height: 68px;
+  }
+
+  .hs-card-mini-art-icon {
+    width : 40px;
+    height: 40px;
+  }
+
+  .hs-card-mini-art-emoji {
+    font-size: 30px;
+    width    : 40px;
+    height   : 40px;
+  }
+
+  .hs-card-mini-cost {
+    width : 22px;
+    height: 22px;
+    font-size: 10px;
+  }
+
+  .hs-card-mini-name {
+    font-size: 11px;
+  }
+
+  .hs-card-mini-game {
+    font-size: 9px;
+  }
+
+  .hs-card-mini-footer {
+    font-size: 10px;
   }
 
   .hs-arena-live {
+    gap       : 20px;
+    max-width : 100%;
+    padding   : 0 10px;
+  }
+
+  .hs-arena-live-side {
+    min-width: 380px;
+  }
+
+  .hs-arena-live-cards {
     gap: 8px;
+  }
+
+  .hs-arena-vs {
+    margin-top: 60px;
+    font-size : 18px;
+  }
+
+  .hs-arena-slot-empty {
+    width : 120px;
+    height: 180px;
   }
 
   .hs-ready-bar {
     flex-wrap: wrap;
     gap      : 8px;
+  }
+
+  /* Ajustes para tela de resultado em mobile */
+  .hs-result-arena {
+    gap      : 16px;
+    max-width: 100%;
+    padding  : 0 10px;
+  }
+
+  .hs-arena-column {
+    min-width: 280px;
+  }
+
+  .hs-arena-cards-row {
+    gap: 6px;
   }
 }

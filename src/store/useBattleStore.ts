@@ -16,6 +16,7 @@ import type { TrophyCard, RarityName } from '../types/duel';
 import type { Game, Achievement } from '../types';
 
 export type BattlePhase = 'select-deck' | 'battle' | 'round-result' | 'game-over';
+export type BotDifficulty = 'easy' | 'normal' | 'hard' | 'king';
 
 /** Custo de cada raridade (exibição / estratégia — sem sistema de mana por enquanto) */
 export const CARD_COST: Record<string, number> = {
@@ -57,10 +58,12 @@ interface BattleState {
   isResolving        : boolean;
   /** Quantas cartas o player jogará no próximo turno de compra */
   cardsPlayedThisRound : number;
+  /** Dificuldade do bot */
+  botDifficulty      : BotDifficulty;
 }
 
 interface BattleActions {
-  startBattle  : (playerDeck: TrophyCard[], playerGames: Game[]) => void;
+  startBattle  : (playerDeck: TrophyCard[], playerGames: Game[], difficulty?: BotDifficulty) => void;
   /** Toggle uma carta na seleção (adiciona se não está, remove se está) */
   toggleCard   : (card: TrophyCard) => void;
   /** Jogador confirma a seleção e passa o turno */
@@ -70,6 +73,7 @@ interface BattleActions {
   nextRound    : () => void;
   resetBattle  : () => void;
   tickTimer    : () => void;
+  setBotDifficulty: (difficulty: BotDifficulty) => void;
 }
 
 const INITIAL_STATE: BattleState = {
@@ -90,6 +94,7 @@ const INITIAL_STATE: BattleState = {
   isPlayerReady      : false,
   isResolving        : false,
   cardsPlayedThisRound: 0,
+  botDifficulty      : 'normal',
 };
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -168,7 +173,25 @@ const SYNTHETIC: Array<{ name: string; description: string; gameName: string; ga
   { name: 'Steam God',      description: 'Colete todos os itens raros', gameName: 'Portal 2',       gameAppId: 620,     rarity: 'mythic'    },
 ];
 
-function buildBotDeck(playerGames: Game[]): TrophyCard[] {
+/** Filtra cartas por dificuldade */
+function filterCardsByDifficulty(cards: TrophyCard[], difficulty: BotDifficulty): TrophyCard[] {
+  switch (difficulty) {
+    case 'easy':
+      // Fácil: até Epic (sem Legendary/Mythic)
+      return cards.filter(c => ['common', 'uncommon', 'rare', 'epic'].includes(c.rarity));
+    case 'hard':
+      // Difícil: apenas Rare+ (raras, épicas, lendárias, míticas)
+      return cards.filter(c => ['rare', 'epic', 'legendary', 'mythic'].includes(c.rarity));
+    case 'king':
+      // Rei dos Troféus: apenas Legendary e Mythic
+      return cards.filter(c => ['legendary', 'mythic'].includes(c.rarity));
+    case 'normal':
+    default:
+      return cards;
+  }
+}
+
+function buildBotDeck(playerGames: Game[], difficulty: BotDifficulty = 'normal'): TrophyCard[] {
   // Preferência: usar conquistas reais do jogador como deck do bot
   const pool: Array<{ achievement: Achievement; game: Game }> = [];
   for (const game of playerGames) {
@@ -177,10 +200,12 @@ function buildBotDeck(playerGames: Game[]): TrophyCard[] {
     }
   }
 
+  let cards: TrophyCard[] = [];
+
   if (pool.length >= 10) {
     const shuffled = shuffleArray(pool);
     const count    = Math.min(20, shuffled.length);
-    return shuffled.slice(0, count).map(({ achievement, game }, i) => {
+    cards = shuffled.slice(0, count).map(({ achievement, game }, i) => {
       const pct    = achievement.globalPercent ?? (Math.random() * 60 + 5);
       const damage = calcDamage(pct);
       const r      = getRarity(damage);
@@ -197,28 +222,73 @@ function buildBotDeck(playerGames: Game[]): TrophyCard[] {
         rarity: r.name, rarityLabel: r.label, rarityEmoji: r.emoji,
       } satisfies TrophyCard;
     });
+  } else {
+    // Fallback sintético
+    // Filtrar por dificuldade
+    let syntheticPool = [...SYNTHETIC];
+    if (difficulty === 'easy') {
+      // Fácil: apenas até Epic (sem Legendary/Mythic)
+      syntheticPool = syntheticPool.filter(a => ['common', 'uncommon', 'rare', 'epic'].includes(a.rarity));
+    } else if (difficulty === 'hard') {
+      syntheticPool = syntheticPool.filter(a => ['rare', 'epic', 'legendary', 'mythic'].includes(a.rarity));
+    } else if (difficulty === 'king') {
+      syntheticPool = syntheticPool.filter(a => ['legendary', 'mythic'].includes(a.rarity));
+    }
+    
+    const shuffled = shuffleArray(syntheticPool.length > 0 ? syntheticPool : SYNTHETIC).slice(0, 16);
+    cards = shuffled.map((ach, i) => {
+      const [min, max] = RARITY_PCT[ach.rarity];
+      const pct    = Math.random() * (max - min) + min;
+      const damage = calcDamage(pct);
+      const r      = getRarity(damage);
+      return {
+        id           : `bot-synth-${i}`,
+        apiName      : ach.name.toLowerCase().replace(/\s+/g, '_'),
+        name         : ach.name,
+        description  : ach.description,
+        iconUrl      : '',
+        gameAppId    : ach.gameAppId,
+        gameName     : ach.gameName,
+        gameHeaderUrl: GAME_HEADERS[ach.gameAppId] ?? '',
+        damage, globalPercent: pct,
+        rarity: r.name, rarityLabel: r.label, rarityEmoji: r.emoji,
+      } satisfies TrophyCard;
+    });
   }
 
-  // Fallback sintético
-  const shuffled = shuffleArray(SYNTHETIC).slice(0, 16);
-  return shuffled.map((ach, i) => {
-    const [min, max] = RARITY_PCT[ach.rarity];
-    const pct    = Math.random() * (max - min) + min;
-    const damage = calcDamage(pct);
-    const r      = getRarity(damage);
-    return {
-      id           : `bot-synth-${i}`,
-      apiName      : ach.name.toLowerCase().replace(/\s+/g, '_'),
-      name         : ach.name,
-      description  : ach.description,
-      iconUrl      : '',
-      gameAppId    : ach.gameAppId,
-      gameName     : ach.gameName,
-      gameHeaderUrl: GAME_HEADERS[ach.gameAppId] ?? '',
-      damage, globalPercent: pct,
-      rarity: r.name, rarityLabel: r.label, rarityEmoji: r.emoji,
-    } satisfies TrophyCard;
-  });
+  // Aplicar filtro de dificuldade
+  const filtered = filterCardsByDifficulty(cards, difficulty);
+  
+  // Só retorna as cartas filtradas, sem adicionar cartas de raridade proibida de volta
+  // Mesmo que o deck fique menor, respeitamos a dificuldade escolhida
+  if (filtered.length > 0) {
+    return shuffleArray(filtered);
+  }
+  
+  // Se não sobrou nenhuma carta após filtrar, gera cartas sintéticas adequadas
+  if (difficulty === 'easy') {
+    const easyPool = SYNTHETIC.filter(a => ['common', 'uncommon', 'rare'].includes(a.rarity));
+    return shuffleArray(easyPool).slice(0, 10).map((ach, i) => {
+      const [min, max] = RARITY_PCT[ach.rarity];
+      const pct = Math.random() * (max - min) + min;
+      const damage = calcDamage(pct);
+      const r = getRarity(damage);
+      return {
+        id: `bot-easy-${i}`,
+        apiName: ach.name.toLowerCase().replace(/\s+/g, '_'),
+        name: ach.name,
+        description: ach.description,
+        iconUrl: '',
+        gameAppId: ach.gameAppId,
+        gameName: ach.gameName,
+        gameHeaderUrl: GAME_HEADERS[ach.gameAppId] ?? '',
+        damage, globalPercent: pct,
+        rarity: r.name, rarityLabel: r.label, rarityEmoji: r.emoji,
+      } satisfies TrophyCard;
+    });
+  }
+  
+  return cards;
 }
 
 // ─── Store ────────────────────────────────────────────────────────────────────
@@ -226,15 +296,22 @@ function buildBotDeck(playerGames: Game[]): TrophyCard[] {
 export const useBattleStore = create<BattleState & BattleActions>((set, get) => ({
   ...INITIAL_STATE,
 
+  // ── Reset ──────────────────────────────────────────────────────────────
+  resetBattle: () => set(INITIAL_STATE),
+
+  // ── Set difficulty ──────────────────────────────────────────────────────
+  setBotDifficulty: (difficulty) => set({ botDifficulty: difficulty }),
+
   // ── Start ────────────────────────────────────────────────────────────────
-  startBattle: (playerDeck, playerGames) => {
-    const botDeck    = buildBotDeck(playerGames);
+  startBattle: (playerDeck, playerGames, difficulty = 'normal') => {
+    const botDeck    = buildBotDeck(playerGames, difficulty);
     const playerDraw = drawCards(playerDeck, 5);
     const botDraw    = drawCards(botDeck,    5);
 
     set({
       ...INITIAL_STATE,
       phase              : 'battle',
+      botDifficulty      : difficulty,
       playerDeck         : playerDraw.remaining,
       botDeck            : botDraw.remaining,
       playerHand         : playerDraw.drawn,
@@ -279,13 +356,25 @@ export const useBattleStore = create<BattleState & BattleActions>((set, get) => 
 
   // ── Bot escolhe cartas ────────────────────────────────────────────────────
   botPlay: () => {
-    const { botHand, selectedBotCards } = get();
+    const { botHand, selectedBotCards, botDifficulty } = get();
     if (selectedBotCards.length > 0 || botHand.length === 0) return;
 
-    // Bot escolhe entre 1 e min(3, mão) cartas aleatoriamente
-    const maxBot = Math.min(MAX_CARDS_PER_TURN, botHand.length);
-    const count  = Math.floor(Math.random() * maxBot) + 1;
-    const chosen = shuffleArray(botHand).slice(0, count);
+    // Regras por dificuldade
+    const maxCards = botDifficulty === 'easy' ? 2 : MAX_CARDS_PER_TURN; // Fácil: max 2 cartas
+    const maxBot = Math.min(maxCards, botHand.length);
+    
+    // Bot inteligente (hard/king) tenta escolher cartas mais fortes
+    let chosen: TrophyCard[];
+    if (botDifficulty === 'hard' || botDifficulty === 'king') {
+      // Ordena por dano (maior primeiro) e escolhe as melhores
+      const sorted = [...botHand].sort((a, b) => b.damage - a.damage);
+      const count = Math.min(maxBot, Math.floor(Math.random() * 2) + 2); // 2-3 cartas
+      chosen = sorted.slice(0, count);
+    } else {
+      // Normal/Easy: escolha aleatória
+      const count  = Math.floor(Math.random() * maxBot) + 1;
+      chosen = shuffleArray(botHand).slice(0, count);
+    }
 
     set({ selectedBotCards: chosen });
 
@@ -389,6 +478,4 @@ export const useBattleStore = create<BattleState & BattleActions>((set, get) => 
       set({ timeLeft: timeLeft - 1 });
     }
   },
-
-  resetBattle: () => set({ ...INITIAL_STATE }),
 }));
