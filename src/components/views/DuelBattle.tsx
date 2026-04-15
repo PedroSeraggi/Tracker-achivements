@@ -10,10 +10,22 @@
 //    - Bot hand: cartas viradas com arco espelhado
 // ─────────────────────────────────────────────────────────────────────────────
 
-import React, { useEffect, useCallback } from 'react';
+import React, { useEffect, useCallback, useState } from 'react';
 import { useBattleStore, getCardCost } from '../../store/useBattleStore';
 import { useFanLayout } from '../../hooks/useFanLayout';
 import type { TrophyCard } from '../../types/duel';
+import {
+  playHoverSound,
+  playCardSelectSound,
+  playCardPlaySound,
+  playReadySound,
+  playWinRoundSound,
+  playLoseRoundSound,
+  playGameWinSound,
+  playGameLoseSound,
+  playTickSound,
+  initAudio,
+} from '../../utils/soundEffects';
 
 // ─── Cores de raridade ────────────────────────────────────────────────────────
 
@@ -48,20 +60,33 @@ const HandCard: React.FC<HandCardProps> = ({
   const pctDisplay  = card.globalPercent != null ? `${card.globalPercent.toFixed(1)}%` : '??%';
   const clickable   = (canSelect && !isSelected) || (canDeselect && isSelected);
 
+  const handleMouseEnter = () => {
+    if (clickable) playHoverSound();
+  };
+
+  const handleClick = () => {
+    if (clickable) {
+      if (isSelected) {
+        playCardSelectSound();
+      } else {
+        playCardSelectSound();
+      }
+      onToggle();
+    }
+  };
+
   return (
     <div
-      className={[
-        'hs-hand-card',
-        isSelected ? 'hs-hand-card--selected' : '',
-        !clickable  ? 'hs-hand-card--dimmed' : '',
-      ].filter(Boolean).join(' ')}
+      className={`hs-hand-card${isSelected ? ' hs-hand-card--selected' : ''}${!canSelect && !isSelected ? ' hs-hand-card--disabled' : ''}`}
+      data-rarity={card.rarity}
       style={{
         ...fanStyle,
-        '--rarity-color': rarityColor,
-        cursor: clickable ? 'pointer' : 'default',
-        marginLeft: `calc(-1 * var(--card-width, 140px) / 2)`,
+        '--rarity-color'   : rarityColor,
+        marginLeft         : `calc(-1 * var(--card-width, 140px) / 2)`,
+        pointerEvents      : clickable ? 'auto' : 'none',
       } as React.CSSProperties}
-      onClick={() => clickable && onToggle()}
+      onClick={handleClick}
+      onMouseEnter={handleMouseEnter}
       title={card.description || card.name}
     >
       <div className="hs-card-inner" data-rarity={card.rarity}>
@@ -274,6 +299,11 @@ const DuelBattle: React.FC = () => {
     toggleCard, pressReady, botPlay, resolveRound, nextRound, resetBattle, tickTimer,
   } = useBattleStore();
 
+  // ── Audio init ───────────────────────────────────────────────────────────
+  useEffect(() => {
+    initAudio();
+  }, []);
+
   // ── Fan layouts ──────────────────────────────────────────────────────────
   const playerFan = useFanLayout(playerHand.length, 140, 18);
   const botFan    = useFanLayout(botHand.length,    56,  8);
@@ -281,33 +311,71 @@ const DuelBattle: React.FC = () => {
   // ── Timer ────────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!isTimerRunning) return;
-    const id = setInterval(tickTimer, 1000);
+    const id = setInterval(() => {
+      tickTimer();
+      // Play tick sound on last 5 seconds
+      if (timeLeft <= 6 && timeLeft > 1) {
+        playTickSound();
+      }
+    }, 1000);
     return () => clearInterval(id);
-  }, [isTimerRunning, tickTimer]);
+  }, [isTimerRunning, tickTimer, timeLeft]);
 
   // ── Bot joga após player confirmar ───────────────────────────────────────
   useEffect(() => {
     if (phase === 'battle' && isPlayerReady && selectedBotCards.length === 0) {
+      playReadySound();
       const t = setTimeout(() => { botPlay(); }, 500);
       return () => clearTimeout(t);
     }
   }, [phase, isPlayerReady, selectedBotCards.length, botPlay]);
 
-  // ── Resolve quando ambos têm cartas ou player passou sem cartas ──────────
+  // ── Resolve quando ambos têm cartas ────────────────────────────────────
   useEffect(() => {
     if (
       phase === 'battle' &&
       isPlayerReady &&
       selectedBotCards.length > 0
     ) {
+      playCardPlaySound();
       const t = setTimeout(() => { resolveRound(); }, 900);
       return () => clearTimeout(t);
     }
   }, [phase, isPlayerReady, selectedBotCards.length, resolveRound]);
 
+  // ── Sons de vitória/derrota do round ─────────────────────────────────────
+  useEffect(() => {
+    if (phase === 'round-result' && roundWinner) {
+      if (roundWinner === 'player') {
+        playWinRoundSound();
+      } else if (roundWinner === 'bot') {
+        playLoseRoundSound();
+      }
+    }
+  }, [phase, roundWinner]);
+
+  // ── Sons de vitória/derrota do jogo ────────────────────────────────────
+  useEffect(() => {
+    if (phase === 'game-over' && gameWinner) {
+      if (gameWinner === 'player') {
+        playGameWinSound();
+      } else {
+        playGameLoseSound();
+      }
+    }
+  }, [phase, gameWinner]);
+
   const handleToggle = useCallback((card: TrophyCard) => {
+    playCardSelectSound();
     toggleCard(card);
   }, [toggleCard]);
+
+  const handlePressReady = () => {
+    if (selectedPlayerCards.length > 0) {
+      playReadySound();
+    }
+    pressReady();
+  };
 
   // ── Somas de dano ────────────────────────────────────────────────────────
   const playerTotal = selectedPlayerCards.reduce((s, c) => s + c.damage, 0);
@@ -347,7 +415,7 @@ const DuelBattle: React.FC = () => {
             <span className="hs-gameover-score-num" style={{ color: !won ? '#f87171' : 'var(--txt)' }}>{botScore}</span>
           </div>
         </div>
-        <button className="hs-btn-primary" onClick={resetBattle}>🔄 Jogar Novamente</button>
+        <button className="hs-btn-primary" onClick={resetBattle} onMouseEnter={playHoverSound}>🔄 Jogar Novamente</button>
       </div>
     );
   }
@@ -401,7 +469,7 @@ const DuelBattle: React.FC = () => {
           />
         </div>
 
-        <button className="hs-btn-primary" onClick={nextRound}>
+        <button className="hs-btn-primary" onClick={nextRound} onMouseEnter={playHoverSound}>
           Próximo Round →
         </button>
       </div>
@@ -529,7 +597,8 @@ const DuelBattle: React.FC = () => {
           {!isPlayerReady && (
             <button
               className={`hs-btn-ready ${selectedPlayerCards.length > 0 ? 'hs-btn-ready--active' : ''}`}
-              onClick={pressReady}
+              onClick={handlePressReady}
+              onMouseEnter={playHoverSound}
             >
               {selectedPlayerCards.length === 0
                 ? 'Passar turno'

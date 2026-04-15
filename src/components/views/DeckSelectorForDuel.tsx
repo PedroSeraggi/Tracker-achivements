@@ -3,10 +3,11 @@
 //  Deck selection screen for starting a duel
 // ─────────────────────────────────────────────────────────────────────────────
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useAppStore } from '../../store/useAppStore';
 import { useBattleStore, type BotDifficulty } from '../../store/useBattleStore';
 import type { Game } from '../../types';
+import { playHoverSound, playCardSelectSound, playReadySound, initAudio } from '../../utils/soundEffects';
 
 // ── XP / Level calculations ────────────────────────────────────────────────────
 function calcXP(games: Game[]): number {
@@ -75,17 +76,31 @@ const DeckSelectorForDuel: React.FC = () => {
   const [selectedDifficulty, setSelectedDifficulty] = useState<BotDifficulty>('normal');
   const [confirmDeck, setConfirmDeck] = useState<{ id: string; name: string; cards: any[] } | null>(null);
   
+  // Inicializar audio
+  useEffect(() => {
+    initAudio();
+  }, []);
+  
   // Calcular nível do usuário
   const userXP = useMemo(() => calcXP(games), [games]);
   const levelNumber = useMemo(() => getLevelNumber(userXP), [userXP]);
   const isKingUnlocked = levelNumber >= 8;
 
+  const handleDifficultyClick = (diff: BotDifficulty, isLocked: boolean) => {
+    if (!isLocked) {
+      playCardSelectSound();
+      setSelectedDifficulty(diff);
+    }
+  };
+
   const handleDeckClick = (deck: typeof savedDecks[0]) => {
+    playCardSelectSound();
     setConfirmDeck({ id: deck.id, name: deck.name, cards: deck.cards });
   };
 
   const handleConfirmStart = () => {
     if (confirmDeck) {
+      playReadySound();
       const deck = savedDecks.find(d => d.id === confirmDeck.id);
       if (deck) {
         startBattle(deck.cards, games, selectedDifficulty);
@@ -125,7 +140,7 @@ const DeckSelectorForDuel: React.FC = () => {
             return (
               <button
                 key={diff}
-                onClick={() => !isLocked && setSelectedDifficulty(diff)}
+                onClick={() => handleDifficultyClick(diff, isLocked)}
                 disabled={isLocked}
                 style={{
                   aspectRatio: '1',
@@ -153,6 +168,7 @@ const DeckSelectorForDuel: React.FC = () => {
                   opacity: isLocked ? 0.5 : 1,
                 }}
                 onMouseEnter={(e) => {
+                  if (!isLocked) playHoverSound();
                   if (!isLocked && selectedDifficulty !== diff) {
                     e.currentTarget.style.borderColor = DIFFICULTY_CONFIG[diff].color;
                   }
@@ -236,6 +252,7 @@ const DeckSelectorForDuel: React.FC = () => {
             <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
               <button
                 onClick={() => setConfirmDeck(null)}
+                onMouseEnter={playHoverSound}
                 style={{
                   padding: '12px 24px',
                   background: 'var(--bg3)',
@@ -251,6 +268,7 @@ const DeckSelectorForDuel: React.FC = () => {
               </button>
               <button
                 onClick={handleConfirmStart}
+                onMouseEnter={playHoverSound}
                 style={{
                   padding: '12px 24px',
                   background: 'var(--accent)',
