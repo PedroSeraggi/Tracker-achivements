@@ -60,7 +60,7 @@ interface AppState {
 
   // ── Duel / Saved Decks
   savedDecks: SavedDeck[];
-  duelView: 'duel' | 'my-decks' | 'view-deck';
+  duelView: 'duel' | 'my-decks' | 'view-deck' | 'battle';
   viewingSavedDeckId: string | null;
 
   // ── Game Library modal
@@ -139,7 +139,7 @@ interface AppState {
   saveDeck: (name: string, cards: TrophyCard[], gameIds: number[]) => void;
   deleteDeck: (id: string) => void;
   updateDeck: (id: string, patch: Partial<SavedDeck>) => void;
-  setDuelView: (view: 'duel' | 'my-decks' | 'view-deck') => void;
+  setDuelView: (view: 'duel' | 'my-decks' | 'view-deck' | 'battle') => void;
   viewSavedDeck: (id: string | null) => void;
 
   // Auth actions

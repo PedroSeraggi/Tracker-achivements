@@ -1,0 +1,708 @@
+/* =============================================================
+   battle.css
+   Hearthstone-style battle UI for Trophy Duel.
+   Import once in main.tsx:  import './styles/battle.css';
+   ============================================================= */
+
+/* ─── Layout ──────────────────────────────────────────────── */
+
+.hs-battle {
+  display       : flex;
+  flex-direction: column;
+  min-height    : 100%;
+  padding       : 0 0 20px;
+  gap           : 0;
+  /* Dark felt-like background */
+  background    : radial-gradient(ellipse at 50% 30%, #0d2235 0%, #080f18 100%);
+}
+
+/* ─── Header / HUD ────────────────────────────────────────── */
+
+.hs-battle-header {
+  display        : flex;
+  align-items    : center;
+  justify-content: space-between;
+  padding        : 16px 20px;
+  background     : rgba(0,0,0,0.45);
+  border-bottom  : 1px solid rgba(255,255,255,0.06);
+  gap            : 12px;
+}
+
+.hs-hud-block {
+  text-align: center;
+  min-width : 64px;
+}
+
+.hs-hud-label {
+  font-size     : 10px;
+  color         : var(--txt3, #556677);
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  margin-bottom : 4px;
+}
+
+.hs-hud-val {
+  font-size  : 22px;
+  font-weight: 900;
+  color      : #fff;
+  line-height: 1;
+}
+
+.hs-hud-score {
+  display    : flex;
+  align-items: center;
+  gap        : 20px;
+}
+
+.hs-hud-score-side {
+  display       : flex;
+  flex-direction: column;
+  align-items   : center;
+  gap           : 2px;
+}
+
+.hs-hud-score-div {
+  font-size: 20px;
+  color    : var(--txt3, #556677);
+}
+
+/* Timer with SVG ring */
+.hs-hud-timer {
+  position : relative;
+  width    : 48px;
+  height   : 48px;
+  display  : flex;
+  align-items: center;
+  justify-content: center;
+  margin   : 0 auto;
+}
+
+.hs-timer-ring {
+  position: absolute;
+  inset   : 0;
+  width   : 100%;
+  height  : 100%;
+}
+
+/* ─── Bot Zone ────────────────────────────────────────────── */
+
+.hs-bot-zone {
+  padding   : 16px 20px 8px;
+  text-align: center;
+}
+
+.hs-bot-zone-label {
+  font-size     : 12px;
+  color         : var(--txt2, #8899aa);
+  margin-bottom : 12px;
+  letter-spacing: 0.5px;
+}
+
+.hs-bot-thinking {
+  color    : #fbbf24;
+  animation: hs-pulse 1s ease-in-out infinite;
+}
+
+@keyframes hs-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.4; }
+}
+
+/* Bot hand — mirrored fan at top */
+.hs-bot-hand {
+  display        : flex;
+  align-items    : flex-end;
+  justify-content: center;
+  height         : 80px;
+  position       : relative;
+  perspective    : 800px;
+}
+
+.hs-bot-card {
+  position       : absolute;
+  width          : 56px;
+  height         : 76px;
+  transform-origin: bottom center;
+  transform      :
+    rotate(var(--rotate, 0deg))
+    translateY(calc(-1 * var(--drop, 0px)));
+  transition     : transform 0.2s ease;
+  left           : 50%;
+  margin-left    : -28px;
+}
+
+.hs-bot-card-inner {
+  width        : 100%;
+  height       : 100%;
+  border-radius: 8px;
+  background   : linear-gradient(135deg, #1a2844, #0f1928);
+  border       : 1px solid rgba(255,255,255,0.1);
+  display      : flex;
+  align-items  : center;
+  justify-content: center;
+  font-size    : 22px;
+  box-shadow   : 0 4px 12px rgba(0,0,0,0.5);
+}
+
+.hs-bot-card-back {
+  opacity: 0.6;
+}
+
+/* ─── Arena ───────────────────────────────────────────────── */
+
+.hs-arena {
+  flex       : 1;
+  display    : flex;
+  align-items: center;
+  justify-content: center;
+  padding    : 16px 20px;
+  min-height : 160px;
+}
+
+.hs-arena-empty {
+  font-size : 14px;
+  color     : var(--txt3, #556677);
+  text-align: center;
+  padding   : 24px;
+  border    : 2px dashed rgba(255,255,255,0.08);
+  border-radius: 16px;
+  width     : 100%;
+  max-width : 480px;
+}
+
+.hs-arena-row {
+  display    : flex;
+  align-items: center;
+  justify-content: center;
+  gap        : 24px;
+  flex-wrap  : wrap;
+  width      : 100%;
+}
+
+.hs-arena-vs {
+  font-size  : 24px;
+  font-weight: 900;
+  color      : rgba(255,255,255,0.3);
+}
+
+.hs-arena-slot {
+  width        : 180px;
+  height       : 100px;
+  border       : 2px dashed rgba(255,255,255,0.12);
+  border-radius: 12px;
+  display      : flex;
+  flex-direction: column;
+  align-items  : center;
+  justify-content: center;
+  gap          : 6px;
+}
+
+.hs-arena-slot-label {
+  font-size: 11px;
+  color    : var(--txt3, #556677);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.hs-arena-slot-hint {
+  font-size: 12px;
+  color    : var(--txt3, #556677);
+  animation: hs-pulse 1.5s ease-in-out infinite;
+}
+
+/* Arena card (played card display) */
+.hs-arena-card {
+  position     : relative;
+  width        : 180px;
+  border-radius: 12px;
+  overflow     : hidden;
+  border       : 2px solid var(--rarity-color, #9ca3af);
+  animation    : hs-card-enter 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  box-shadow   : 0 8px 24px rgba(0,0,0,0.5),
+                 0 0 20px color-mix(in srgb, var(--rarity-color, #9ca3af) 30%, transparent);
+}
+
+.hs-arena-card--winner {
+  box-shadow: 0 8px 40px rgba(0,0,0,0.5),
+              0 0 40px color-mix(in srgb, var(--rarity-color, #9ca3af) 60%, transparent);
+}
+
+.hs-arena-winner-glow {
+  position     : absolute;
+  inset        : 0;
+  border       : 3px solid var(--rarity-color, #fff);
+  border-radius: 10px;
+  pointer-events: none;
+  animation    : hs-winner-pulse 0.6s ease-in-out infinite alternate;
+}
+
+@keyframes hs-winner-pulse {
+  from { opacity: 0.4; }
+  to   { opacity: 1; }
+}
+
+.hs-arena-card-inner {
+  display: flex;
+  height : 100px;
+}
+
+.hs-arena-card-info {
+  flex   : 1;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap   : 3px;
+  background: rgba(0,0,0,0.35);
+}
+
+.hs-arena-card-label {
+  font-size     : 9px;
+  color         : var(--txt3, #556677);
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+}
+
+.hs-arena-card-damage {
+  font-size  : 20px;
+  font-weight: 900;
+  color      : var(--rarity-color, #fff);
+  margin-top : 2px;
+}
+
+@keyframes hs-card-enter {
+  from {
+    opacity  : 0;
+    transform: translateY(-20px) scale(0.88);
+  }
+  to {
+    opacity  : 1;
+    transform: translateY(0)    scale(1);
+  }
+}
+
+/* ─── Player Hand ─────────────────────────────────────────── */
+
+.hs-player-zone {
+  padding   : 8px 16px 0;
+  text-align: center;
+}
+
+.hs-player-zone-label {
+  font-size    : 12px;
+  color        : var(--txt2, #8899aa);
+  margin-bottom: 4px;
+}
+
+.hs-player-hand {
+  display        : flex;
+  align-items    : flex-end;
+  justify-content: center;
+  height         : 200px;
+  position       : relative;
+  perspective    : 900px;
+  overflow       : visible;
+}
+
+/* ─── Hand Card ───────────────────────────────────────────── */
+
+.hs-hand-card {
+  position       : absolute;
+  width          : var(--card-width, 140px);
+  height         : var(--card-height, 210px);
+  transform-origin: bottom center;
+  /* Fan positioning: rotate + lower edge cards */
+  transform      :
+    rotate(var(--rotate, 0deg))
+    translateY(var(--drop, 0px));
+  transition     :
+    transform     0.22s cubic-bezier(0.34, 1.4, 0.64, 1),
+    z-index       0s,
+    filter        0.2s;
+  cursor         : pointer;
+  z-index        : 1;
+  /* Stagger the positioning horizontally */
+  left           : 50%;
+  margin-left    : calc(-1 * var(--card-width, 140px) / 2);
+}
+
+/* Override horizontal position via inline JS — handled by JS below */
+
+.hs-hand-card:hover,
+.hs-hand-card--hovered {
+  transform   : rotate(0deg) translateY(-40px) scale(1.12) !important;
+  z-index     : 20 !important;
+  filter      : drop-shadow(0 20px 30px rgba(0,0,0,0.7));
+}
+
+.hs-hand-card--selected {
+  transform   : rotate(0deg) translateY(-80px) scale(1.08) !important;
+  z-index     : 30 !important;
+  filter      : drop-shadow(0 30px 50px rgba(255,255,255,0.3));
+  pointer-events: none;
+}
+
+.hs-hand-card--playing {
+  animation   : hs-play-card 0.4s cubic-bezier(0.22, 1, 0.36, 1) forwards !important;
+  z-index     : 50 !important;
+  pointer-events: none;
+}
+
+@keyframes hs-play-card {
+  to {
+    transform: translateY(-200px) scale(0.9);
+    opacity  : 0;
+  }
+}
+
+.hs-hand-card--dimmed {
+  filter  : brightness(0.55) saturate(0.5);
+  cursor  : default;
+}
+
+/* ── Card inner ── */
+
+.hs-card-inner {
+  width        : 100%;
+  height       : 100%;
+  border-radius: var(--card-radius, 14px);
+  overflow     : hidden;
+  background   : var(--bg2, #1a2332);
+  border       : 2px solid transparent;
+  display      : flex;
+  flex-direction: column;
+  position     : relative;
+  transition   : border-color 0.2s, box-shadow 0.2s;
+}
+
+/* Rarity borders */
+.hs-card-inner[data-rarity="common"]    { border-color: #9ca3af; box-shadow: 0 4px 12px rgba(156,163,175,0.2); }
+.hs-card-inner[data-rarity="uncommon"]  { border-color: #4ade80; box-shadow: 0 4px 14px rgba(74,222,128,0.25); }
+.hs-card-inner[data-rarity="rare"]      { border-color: #60a5fa; box-shadow: 0 4px 16px rgba(96,165,250,0.3); }
+.hs-card-inner[data-rarity="epic"]      { border-color: #c084fc; box-shadow: 0 4px 18px rgba(192,132,252,0.35); }
+.hs-card-inner[data-rarity="legendary"] { border-color: #fbbf24; box-shadow: 0 6px 24px rgba(251,191,36,0.45); }
+.hs-card-inner[data-rarity="mythic"]    { border-color: #f472b6; box-shadow: 0 8px 28px rgba(244,114,182,0.5); }
+
+/* Shine on hover for legendary / mythic */
+.hs-hand-card--hovered .hs-card-inner[data-rarity="legendary"],
+.hs-hand-card--hovered .hs-card-inner[data-rarity="mythic"] {
+  box-shadow: 0 16px 48px color-mix(in srgb, var(--rarity-color) 60%, transparent);
+}
+
+/* ── Art area (reused from trophy-duel.css) ── */
+.hs-card-art {
+  position: relative;
+  flex    : 0 0 110px;
+  overflow: hidden;
+}
+
+.hs-card-art-bg {
+  position           : absolute;
+  inset              : 0;
+  background-size    : cover;
+  background-position: center;
+  filter             : blur(6px) brightness(0.35);
+  transform          : scale(1.1);
+}
+
+.hs-card-art-icon {
+  position : absolute;
+  top      : 50%;
+  left     : 50%;
+  transform: translate(-50%, -50%);
+  width    : 58px;
+  height   : 58px;
+  border-radius: 8px;
+  object-fit: contain;
+  filter   : drop-shadow(0 4px 10px rgba(0,0,0,0.6));
+  z-index  : 1;
+}
+
+.hs-card-art-emoji {
+  position       : absolute;
+  top            : 50%;
+  left           : 50%;
+  transform      : translate(-50%, -50%);
+  font-size      : 36px;
+  z-index        : 1;
+  display        : flex;
+  align-items    : center;
+  justify-content: center;
+  width          : 58px;
+  height         : 58px;
+  border-radius  : 10px;
+  background     : rgba(0,0,0,0.4);
+  border         : 2px solid var(--rarity-color, #9ca3af);
+  box-shadow     : 0 4px 16px color-mix(in srgb, var(--rarity-color, #9ca3af) 35%, transparent);
+}
+
+.hs-card-rarity-badge {
+  position      : absolute;
+  top           : 6px;
+  left          : 6px;
+  z-index       : 2;
+  background    : rgba(0,0,0,0.72);
+  border-radius : 4px;
+  padding       : 2px 6px;
+  font-size     : 8px;
+  font-weight   : 700;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color         : var(--rarity-color, #9ca3af);
+  border        : 1px solid var(--rarity-color, #9ca3af);
+}
+
+.hs-card-game-thumb {
+  position     : absolute;
+  bottom       : 6px;
+  left         : 6px;
+  width        : 40px;
+  height       : 18px;
+  border-radius: 3px;
+  overflow     : hidden;
+  z-index      : 2;
+  border       : 1px solid rgba(255,255,255,0.12);
+}
+
+.hs-card-game-thumb img {
+  width     : 100%;
+  height    : 100%;
+  object-fit: cover;
+  display   : block;
+}
+
+/* ── Card body ── */
+.hs-card-body {
+  flex   : 1;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap    : 3px;
+  background: linear-gradient(180deg, rgba(0,0,0,0.25) 0%, transparent 100%);
+}
+
+.hs-card-name {
+  font-size  : 11px;
+  font-weight: 700;
+  color      : #fff;
+  line-height: 1.3;
+  display            : -webkit-box;
+  -webkit-line-clamp : 2;
+  line-clamp         : 2;
+  -webkit-box-orient : vertical;
+  overflow           : hidden;
+}
+
+.hs-card-game {
+  font-size    : 9px;
+  color        : var(--txt3, #556677);
+  white-space  : nowrap;
+  overflow     : hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Card footer ── */
+.hs-card-footer {
+  padding        : 6px 10px 8px;
+  display        : flex;
+  align-items    : center;
+  justify-content: space-between;
+  border-top     : 1px solid rgba(255,255,255,0.06);
+}
+
+.hs-card-pct {
+  font-size: 9px;
+  color    : var(--txt3, #556677);
+}
+
+.hs-card-pct::before { content: '👥 '; font-size: 8px; }
+
+.hs-card-damage {
+  display    : flex;
+  align-items: center;
+  gap        : 3px;
+  font-size  : 15px;
+  font-weight: 900;
+  color      : var(--rarity-color, #9ca3af);
+}
+
+/* ── Selection overlay (inside card, no external element) ── */
+.hs-card-selected-overlay {
+  position     : absolute;
+  inset        : 0;
+  border-radius: calc(var(--card-radius, 14px) - 2px);
+  border       : 3px solid #fff;
+  box-shadow   : inset 0 0 20px rgba(255,255,255,0.25),
+                 0 0 30px rgba(255,255,255,0.4);
+  pointer-events: none;
+  z-index      : 10;
+  animation    : hs-select-glow 0.5s ease;
+}
+
+@keyframes hs-select-glow {
+  from { opacity: 0; transform: scale(1.05); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+/* ─── Round Result ────────────────────────────────────────── */
+
+.hs-round-result {
+  display       : flex;
+  flex-direction: column;
+  align-items   : center;
+  padding       : 32px 20px;
+  gap           : 20px;
+}
+
+.hs-round-result-header {
+  display       : flex;
+  flex-direction: column;
+  align-items   : center;
+  gap           : 12px;
+}
+
+.hs-round-result-title {
+  font-size  : 20px;
+  font-weight: 700;
+  color      : #fff;
+}
+
+.hs-scoreboard {
+  display    : flex;
+  align-items: center;
+  gap        : 16px;
+  padding    : 12px 24px;
+  background : var(--bg2, #1a2332);
+  border     : 1px solid var(--b2, #223344);
+  border-radius: 12px;
+}
+
+.hs-scoreboard-side {
+  display    : flex;
+  align-items: center;
+  gap        : 8px;
+}
+
+.hs-scoreboard-label {
+  font-size: 12px;
+  color    : var(--txt3, #556677);
+}
+
+.hs-scoreboard-num {
+  font-size  : 26px;
+  font-weight: 900;
+}
+
+.hs-scoreboard-vs {
+  font-size: 16px;
+  color    : var(--txt3, #556677);
+}
+
+.hs-draw-badge {
+  padding      : 8px 20px;
+  background   : rgba(255,255,255,0.06);
+  border       : 1px solid rgba(255,255,255,0.12);
+  border-radius: 8px;
+  font-size    : 13px;
+  color        : var(--txt2, #8899aa);
+}
+
+/* ─── Game Over ───────────────────────────────────────────── */
+
+.hs-gameover {
+  display       : flex;
+  flex-direction: column;
+  align-items   : center;
+  justify-content: center;
+  padding       : 60px 20px;
+  gap           : 16px;
+  text-align    : center;
+}
+
+.hs-gameover-icon  { font-size: 80px; }
+.hs-gameover-title { font-size: 32px; font-weight: 800; margin: 0; }
+.hs-gameover-sub   { font-size: 15px; color: var(--txt2, #8899aa); margin: 0; max-width: 360px; }
+
+.hs-gameover-score {
+  display    : flex;
+  align-items: center;
+  gap        : 32px;
+  padding    : 20px 48px;
+  background : var(--bg2, #1a2332);
+  border     : 1px solid var(--b2, #223344);
+  border-radius: 14px;
+}
+
+.hs-gameover-score-side { text-align: center; }
+.hs-gameover-score-label { font-size: 12px; color: var(--txt3, #556677); }
+.hs-gameover-score-num { font-size: 36px; font-weight: 900; }
+.hs-gameover-score-vs { font-size: 20px; color: var(--txt3, #556677); }
+
+/* ─── Button ──────────────────────────────────────────────── */
+
+.hs-btn-primary {
+  padding      : 13px 36px;
+  background   : var(--accent, #3a7acc);
+  border       : none;
+  border-radius: 10px;
+  color        : #fff;
+  font-size    : 15px;
+  font-weight  : 700;
+  cursor       : pointer;
+  transition   : opacity 0.2s, transform 0.15s;
+}
+
+.hs-btn-primary:hover {
+  opacity  : 0.88;
+  transform: translateY(-2px);
+}
+
+/* ─── Toast ───────────────────────────────────────────────── */
+
+.hs-played-toast {
+  position      : fixed;
+  bottom        : 24px;
+  left          : 50%;
+  transform     : translateX(-50%);
+  padding       : 11px 24px;
+  background    : var(--accent, #3a7acc);
+  border-radius : 8px;
+  color         : #fff;
+  font-weight   : 600;
+  font-size     : 14px;
+  z-index       : 200;
+  animation     : hs-toast-in 0.3s ease;
+  pointer-events: none;
+  white-space   : nowrap;
+}
+
+@keyframes hs-toast-in {
+  from { opacity: 0; transform: translateX(-50%) translateY(12px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+/* ─── Responsive ──────────────────────────────────────────── */
+
+@media (max-width: 600px) {
+  .hs-player-hand {
+    height: 160px;
+  }
+
+  .hs-hand-card {
+    --card-width : 110px;
+    --card-height: 165px;
+  }
+
+  .hs-arena-row {
+    gap: 12px;
+  }
+
+  .hs-arena-card {
+    width: 140px;
+  }
+
+  .hs-gameover-score {
+    gap    : 20px;
+    padding: 16px 28px;
+  }
+}

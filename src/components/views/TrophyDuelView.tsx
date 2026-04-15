@@ -17,6 +17,9 @@ import GameSelectionPhase from './GameSelectionPhase';
 import DeckPhase from './DeckPhase';
 import SavedDecksView from './SavedDecksView';
 import SavedDeckDetail from './SavedDeckDetail';
+import DeckSelectorForDuel from './DeckSelectorForDuel';
+import DuelBattle from './DuelBattle';
+import { useBattleStore } from '../../store/useBattleStore';
 
 const TrophyDuelView: React.FC = () => {
   // ── Read games from the main app store ──────────────────────────────────
@@ -96,9 +99,13 @@ const TrophyDuelView: React.FC = () => {
 
   // ── Tabs ────────────────────────────────────────────────────────────────
   const tabs = [
-    { key: 'duel', label: '⚔️ Novo Deck' },
+    { key: 'duel', label: '✨ Criador de Decks' },
     { key: 'my-decks', label: '📁 Meus Decks' },
+    { key: 'battle', label: '⚔️ Duelos' },
   ] as const;
+
+  // ── Battle state ────────────────────────────────────────────────────────
+  const battlePhase = useBattleStore((s) => s.phase);
 
   // ── Render ───────────────────────────────────────────────────────────────
   if (duelView === 'my-decks') {
@@ -137,6 +144,26 @@ const TrophyDuelView: React.FC = () => {
           ))}
         </div>
         <SavedDeckDetail />
+      </div>
+    );
+  }
+
+  if (duelView === 'battle') {
+    return (
+      <div id="view-duel">
+        {/* Tabs */}
+        <div className="duel-tabs">
+          {tabs.map((t) => (
+            <button
+              key={t.key}
+              className={`duel-tab ${duelView === t.key ? 'active' : ''}`}
+              onClick={() => setDuelView(t.key)}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+        {battlePhase === 'select-deck' ? <DeckSelectorForDuel /> : <DuelBattle />}
       </div>
     );
   }
