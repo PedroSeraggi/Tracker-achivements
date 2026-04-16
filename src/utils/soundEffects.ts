@@ -105,6 +105,15 @@ export function playErrorSound() {
   playTone(150, 0.2, 'sawtooth', 0.2);
 }
 
+export function playFuseSound() {
+  // Magical fusion sound - ascending sparkles
+  playTone(523.25, 0.1, 'sine', 0.2); // C5
+  setTimeout(() => playTone(659.25, 0.1, 'sine', 0.25), 80); // E5
+  setTimeout(() => playTone(783.99, 0.1, 'sine', 0.3), 160); // G5
+  setTimeout(() => playTone(1046.50, 0.2, 'sine', 0.35), 240); // C6
+  setTimeout(() => playTone(1318.51, 0.3, 'triangle', 0.4), 400); // E6 magical finish
+}
+
 // Initialize audio context on first user interaction
 export function initAudio() {
   if (audioContext && audioContext.state === 'suspended') {

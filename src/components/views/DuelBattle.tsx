@@ -11,7 +11,7 @@
 //    - Tela de game-over mostra HP final
 // ─────────────────────────────────────────────────────────────────────────────
 
-import React, { useEffect, useCallback, useMemo } from 'react';
+import React, { useEffect, useCallback, useMemo, useState } from 'react';
 import { useBattleStore, getCardCost } from '../../store/useBattleStore';
 import { useFanLayout } from '../../hooks/useFanLayout';
 import type { TrophyCard } from '../../types/duel';
@@ -25,6 +25,7 @@ import {
   playGameWinSound,
   playGameLoseSound,
   playTickSound,
+  playFuseSound,
   initAudio,
 } from '../../utils/soundEffects';
 
@@ -102,10 +103,11 @@ interface HandCardProps {
   canDeselect : boolean;
   noMana      : boolean;   // ← TRUE quando não tem mana (dimm vermelho)
   onToggle    : () => void;
+  isFusingCard?: boolean;  // ← TRUE quando está sendo fundida
 }
 
 const HandCard: React.FC<HandCardProps> = ({
-  card, fanStyle, selOrder, canSelect, canDeselect, noMana, onToggle,
+  card, fanStyle, selOrder, canSelect, canDeselect, noMana, onToggle, isFusingCard,
 }) => {
   const isSelected  = selOrder > 0;
   const cost        = getCardCost(card.rarity);
@@ -118,6 +120,7 @@ const HandCard: React.FC<HandCardProps> = ({
   if (isSelected) extraClass = ' hs-hand-card--selected';
   else if (noMana) extraClass = ' hs-hand-card--nomana';
   else if (!canSelect) extraClass = ' hs-hand-card--disabled';
+  if (isFusingCard) extraClass += ' hs-hand-card--fusing';
 
   return (
     <div
@@ -226,21 +229,29 @@ const BotFaceDown: React.FC<{ fanStyle: Record<string, string | number> }> = ({ 
 // Mantido EXATAMENTE como o usuário personalizou (hs-card-mini)
 
 const ArenaCard: React.FC<{
-  card    : TrophyCard;
-  isWinner?: boolean;
-  delay   ?: number;
-}> = ({ card, isWinner, delay = 0 }) => {
+  card       : TrophyCard;
+  isWinner?  : boolean;
+  delay?     : number;
+  isAttacking?: boolean;  // Animação de ataque (vencedor)
+  isDestroyed?: boolean;  // Animação de destruição (perdedor)
+}> = ({ card, isWinner, delay = 0, isAttacking, isDestroyed }) => {
   const rarityColor = RARITY_COLOR[card.rarity] ?? '#9ca3af';
   const cost        = getCardCost(card.rarity);
   const pctDisplay  = card.globalPercent != null ? `${card.globalPercent.toFixed(1)}%` : '??%';
 
+  let extraClass = '';
+  if (isWinner) extraClass += ' hs-arena-card--winner';
+  if (isAttacking) extraClass += ' hs-arena-card--attacking';
+  if (isDestroyed) extraClass += ' hs-arena-card--destroyed';
+
   return (
     <div
-      className={`hs-arena-card${isWinner ? ' hs-arena-card--winner' : ''}`}
+      className={`hs-arena-card${extraClass}`}
       data-rarity={card.rarity}
       style={{ '--rarity-color': rarityColor, animationDelay: `${delay}s` } as React.CSSProperties}
       title={card.description || card.name}
     >
+      {isAttacking && <div className="hs-arena-impact" />}
       <div className="hs-card-mini" data-rarity={card.rarity}>
         <div className="hs-card-mini-cost" style={{ background: rarityColor }}>
           {cost}
@@ -286,12 +297,14 @@ const ArenaCard: React.FC<{
 // ─── Sub: coluna de arena ─────────────────────────────────────────────────────
 
 const ArenaColumn: React.FC<{
-  cards   : TrophyCard[];
-  total   : number;
-  isWinner?: boolean;
-  label   : string;
-  waiting ?: boolean;
-}> = ({ cards, total, isWinner, label, waiting }) => (
+  cards       : TrophyCard[];
+  total       : number;
+  isWinner?   : boolean;
+  label       : string;
+  waiting?    : boolean;
+  isAttacking?: boolean;  // Animação de ataque (vencedor)
+  isDestroyed?: boolean;  // Animação de destruição (perdedor)
+}> = ({ cards, total, isWinner, label, waiting, isAttacking, isDestroyed }) => (
   <div className="hs-arena-column">
     <div className="hs-arena-column-label">{label}</div>
     {cards.length === 0 ? (
@@ -302,7 +315,14 @@ const ArenaColumn: React.FC<{
       <>
         <div className="hs-arena-cards-row">
           {cards.map((c, i) => (
-            <ArenaCard key={c.id} card={c} isWinner={isWinner} delay={i * 0.08} />
+            <ArenaCard 
+              key={c.id} 
+              card={c} 
+              isWinner={isWinner} 
+              delay={i * 0.08}
+              isAttacking={isAttacking}
+              isDestroyed={isDestroyed}
+            />
           ))}
         </div>
         <div className="hs-arena-total" style={{ color: isWinner ? '#4ade80' : 'var(--txt2)' }}>
@@ -328,6 +348,13 @@ const DuelBattle: React.FC = () => {
     toggleCard, fuseCards, pressReady,
     botPlay, resolveRound, nextRound, resetBattle, tickTimer,
   } = useBattleStore();
+
+  // ── Animação de fusão ────────────────────────────────────────────────────
+  const [isFusing, setIsFusing] = useState(false);
+  const [fusingIds, setFusingIds] = useState<string[]>([]);
+
+  // ── Animação de ataque/destruição no round result ────────────────────────
+  const [isAttacking, setIsAttacking] = useState(false);
 
   // ── Audio init ───────────────────────────────────────────────────────────
   useEffect(() => { initAudio(); }, []);
@@ -366,11 +393,16 @@ const DuelBattle: React.FC = () => {
     }
   }, [phase, isPlayerReady, selectedBotCards, resolveRound]); // eslint-disable-line
 
-  // ── Sons ─────────────────────────────────────────────────────────────────
+  // ── Sons e animação de ataque ────────────────────────────────────────────
   useEffect(() => {
     if (phase === 'round-result' && roundWinner) {
       if (roundWinner === 'player') playWinRoundSound();
       else if (roundWinner === 'bot') playLoseRoundSound();
+      // Ativa animação de ataque após um pequeno delay
+      const t = setTimeout(() => setIsAttacking(true), 100);
+      return () => clearTimeout(t);
+    } else if (phase !== 'round-result') {
+      setIsAttacking(false);
     }
   }, [phase, roundWinner]);
 
@@ -509,6 +541,8 @@ const DuelBattle: React.FC = () => {
             total={playerTotal}
             isWinner={playerWon}
             label="Suas cartas"
+            isAttacking={isAttacking && playerWon}
+            isDestroyed={isAttacking && botWon}
           />
           <div className="hs-arena-vs">VS</div>
           <ArenaColumn
@@ -516,6 +550,8 @@ const DuelBattle: React.FC = () => {
             total={botTotal}
             isWinner={botWon}
             label="Bot"
+            isAttacking={isAttacking && botWon}
+            isDestroyed={isAttacking && playerWon}
           />
         </div>
 
@@ -653,12 +689,19 @@ const DuelBattle: React.FC = () => {
           </div>
 
           {/* Botão de fusão — aparece quando há par fusível */}
-          {!isPlayerReady && fusablePair && (
+          {!isPlayerReady && fusablePair && !isFusing && (
             <button
               className="hs-btn-fuse"
               onClick={() => {
-                playCardSelectSound();
-                fuseCards(fusablePair[0].id, fusablePair[1].id);
+                playFuseSound();
+                setIsFusing(true);
+                setFusingIds([fusablePair[0].id, fusablePair[1].id]);
+                // Aguarda animação antes de fundir
+                setTimeout(() => {
+                  fuseCards(fusablePair[0].id, fusablePair[1].id);
+                  setIsFusing(false);
+                  setFusingIds([]);
+                }, 600);
               }}
               onMouseEnter={playHoverSound}
               title={`Fundir 2 cartas ${fusablePair[0].rarity} → ${fusablePair[0].rarity} superior`}
@@ -706,6 +749,7 @@ const DuelBattle: React.FC = () => {
                 canDeselect={canDeselect}
                 noMana={noMana}
                 onToggle={() => handleToggle(card)}
+                isFusingCard={fusingIds.includes(card.id)}
               />
             );
           })}

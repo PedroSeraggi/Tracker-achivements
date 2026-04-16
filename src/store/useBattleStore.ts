@@ -63,6 +63,7 @@ const MAX_CARDS_PER_TURN = 3;
 const TIMER_SECONDS      = 30;
 const INITIAL_HP         = 3500;
 const INITIAL_MANA       = 3;
+const MAX_HAND_SIZE      = 8;
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -496,11 +497,15 @@ export const useBattleStore = create<BattleState & BattleActions>((set, get) => 
     // Compra: 1 carta base + espaços vazios no tabuleiro
     // espaços_vazios = MAX_CARDS_PER_TURN - cartas_jogadas
     // total = 1 + (3 - N) = 4 - N  (fusão conta como 1)
+    // Respeita limite máximo de 8 cartas na mão
     const playerDrawCount = Math.max(1, 4 - cardsPlayedThisRound);
     const botDrawCount    = Math.max(1, 4 - selectedBotCards.length);
+    
+    const playerActualDraw = Math.min(playerDrawCount, MAX_HAND_SIZE - newPlayerHand.length);
+    const botActualDraw    = Math.min(botDrawCount,    MAX_HAND_SIZE - newBotHand.length);
 
-    const playerDraw = drawCards(playerDeck, playerDrawCount);
-    const botDraw    = drawCards(botDeck,    botDrawCount);
+    const playerDraw = drawCards(playerDeck, Math.max(0, playerActualDraw));
+    const botDraw    = drawCards(botDeck,    Math.max(0, botActualDraw));
 
     set({
       phase               : 'battle',
