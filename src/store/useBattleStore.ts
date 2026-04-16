@@ -29,7 +29,7 @@ export const CARD_COST: Record<string, number> = {
   rare     : 3,
   epic     : 4,
   legendary: 5,
-  mythic   : 5,
+  mythic   : 6,
 };
 
 export function getCardCost(rarity: string): number {
@@ -324,8 +324,9 @@ export const useBattleStore = create<BattleState & BattleActions>((set, get) => 
 
   // ── Fundir duas cartas de mesma raridade ─────────────────────────────────
   fuseCards: (card1Id, card2Id) => {
-    const { selectedPlayerCards, playerHand, phase, isPlayerReady } = get();
+    const { selectedPlayerCards, playerHand, phase, isPlayerReady, currentMana } = get();
     if (phase !== 'battle' || isPlayerReady) return;
+    if (currentMana < 1) return; // Custo de 1 mana para fusão
 
     const card1 = selectedPlayerCards.find(c => c.id === card1Id);
     const card2 = selectedPlayerCards.find(c => c.id === card2Id);
@@ -338,9 +339,9 @@ export const useBattleStore = create<BattleState & BattleActions>((set, get) => 
     // Carta base: a mais forte das duas
     const base = card1.damage >= card2.damage ? card1 : card2;
 
-    // Dano da carta fundida: soma das duas com 85% de eficiência
-    // (ligeiramente abaixo da soma para não dominar demais)
-    const fusedDamage = Math.round((card1.damage + card2.damage) * 0.85);
+    // Dano da carta fundida: soma das duas com 75% de eficiência
+
+    const fusedDamage = Math.round((card1.damage + card2.damage) * 0.75);
 
     const fusedCard: TrophyCard = {
       id           : `fused-${Date.now()}`,
@@ -367,6 +368,7 @@ export const useBattleStore = create<BattleState & BattleActions>((set, get) => 
     set({
       playerHand          : [...newHand, fusedCard],
       selectedPlayerCards : newSelected,
+      currentMana         : currentMana - 1, // Consome 1 mana
     });
   },
 
