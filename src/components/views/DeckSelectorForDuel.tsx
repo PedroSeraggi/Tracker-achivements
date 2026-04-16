@@ -47,23 +47,8 @@ function getLevelNumber(xp: number): number {
   return parseInt(current.label.replace(/\D/g, ''), 10) || 1;
 }
 
-// Games used by the bot (from the achievements database)
-const BOT_GAMES = [
-  { name: 'Counter-Strike 2', appId: 730, header: 'https://cdn.akamai.steamstatic.com/steam/apps/730/header.jpg' },
-  { name: 'Dota 2', appId: 570, header: 'https://cdn.akamai.steamstatic.com/steam/apps/570/header.jpg' },
-  { name: 'Team Fortress 2', appId: 440, header: 'https://cdn.akamai.steamstatic.com/steam/apps/440/header.jpg' },
-  { name: 'Apex Legends', appId: 1172470, header: 'https://cdn.akamai.steamstatic.com/steam/apps/1172470/header.jpg' },
-  { name: 'Rocket League', appId: 252950, header: 'https://cdn.akamai.steamstatic.com/steam/apps/252950/header.jpg' },
-  { name: 'Rust', appId: 252490, header: 'https://cdn.akamai.steamstatic.com/steam/apps/252490/header.jpg' },
-  { name: 'Warframe', appId: 230410, header: 'https://cdn.akamai.steamstatic.com/steam/apps/230410/header.jpg' },
-  { name: 'ARK: Survival Evolved', appId: 346110, header: 'https://cdn.akamai.steamstatic.com/steam/apps/346110/header.jpg' },
-  { name: 'Terraria', appId: 105600, header: 'https://cdn.akamai.steamstatic.com/steam/apps/105600/header.jpg' },
-  { name: 'Half-Life 2', appId: 220, header: 'https://cdn.akamai.steamstatic.com/steam/apps/220/header.jpg' },
-  { name: 'Portal 2', appId: 620, header: 'https://cdn.akamai.steamstatic.com/steam/apps/620/header.jpg' },
-];
-
 const DIFFICULTY_CONFIG: Record<BotDifficulty, { label: string; emoji: string; color: string; desc: string }> = {
-  easy:   { label: 'Fácil',   emoji: '🌱', color: '#4ade80', desc: 'Para filhinhos do papai gugudada ' },
+  easy:   { label: 'Fácil',   emoji: '🌱', color: '#4ade80', desc: 'Para filhinhos do papai' },
   normal: { label: 'Normal',  emoji: '⚔️', color: '#3b82f6', desc: 'Vamos ver do que você é capaz... ' },
   hard:   { label: 'Difícil', emoji: '🔥', color: '#f59e0b', desc: 'Aqui a parada fica seria' },
   king:   { label: 'REI!!',   emoji: '👑', color: '#a855f7', desc: 'ESSE MALDITO ESTA ROUBANDO!!' },

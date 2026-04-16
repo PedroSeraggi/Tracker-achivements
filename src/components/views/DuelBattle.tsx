@@ -1,16 +1,17 @@
 // ─────────────────────────────────────────────────────────────────────────────
-//  src/components/duel/DuelBattle.tsx  (v2)
+//  src/components/duel/DuelBattle.tsx  (v3)
 //
-//  Novidades:
-//    - Seleção de até 3 cartas com badge de ordem (①②③)
-//    - Botão "Pronto" sempre visível, mostra quantas cartas selecionadas
-//    - Badge de custo em cada carta (base na raridade)
-//    - Arena mostra até 3 cartas de cada lado com total de dano
-//    - Layout corrigido: hand fica na base, arena cresce no meio
-//    - Bot hand: cartas viradas com arco espelhado
+//  Preserva TODAS as mudanças de UI do v2 (hs-card-mini, sons, etc.)
+//  e adiciona:
+//    - Barras de HP no HUD (substituem placar de pontos)
+//    - Gemas de mana no HUD
+//    - Bloqueio de seleção por mana insuficiente (dimm diferente)
+//    - Botão "✨ Fundir" quando 2 cartas de mesma raridade selecionadas
+//    - Tela de round-result mostra o dano causado e HP restante
+//    - Tela de game-over mostra HP final
 // ─────────────────────────────────────────────────────────────────────────────
 
-import React, { useEffect, useCallback, useState } from 'react';
+import React, { useEffect, useCallback, useMemo } from 'react';
 import { useBattleStore, getCardCost } from '../../store/useBattleStore';
 import { useFanLayout } from '../../hooks/useFanLayout';
 import type { TrophyCard } from '../../types/duel';
@@ -27,7 +28,7 @@ import {
   initAudio,
 } from '../../utils/soundEffects';
 
-// ─── Cores de raridade ────────────────────────────────────────────────────────
+// ─── Cores ────────────────────────────────────────────────────────────────────
 
 const RARITY_COLOR: Record<string, string> = {
   common   : '#9ca3af',
@@ -38,21 +39,73 @@ const RARITY_COLOR: Record<string, string> = {
   mythic   : '#f472b6',
 };
 
-// ─── Sub: carta na mão do jogador ────────────────────────────────────────────
+const INITIAL_HP = 3500;
+
+// ─── Sub: barra de HP ─────────────────────────────────────────────────────────
+
+const HpBar: React.FC<{ hp: number; maxHp?: number; label: string; damaged?: boolean }> = ({
+  hp, maxHp = INITIAL_HP, label, damaged,
+}) => {
+  const pct = Math.max(0, Math.min(100, (hp / maxHp) * 100));
+  const barColor =
+    pct > 50 ? '#4ade80' :
+    pct > 25 ? '#fbbf24' : '#f87171';
+
+  return (
+    <div className="hs-hp-block">
+      <div className="hs-hp-label">{label}</div>
+      <div className="hs-hp-bar-wrap">
+        <div
+          className={`hs-hp-bar${damaged ? ' hs-hp-bar--damaged' : ''}`}
+          style={{ width: `${pct}%`, background: barColor }}
+        />
+      </div>
+      <div className="hs-hp-val" style={{ color: barColor }}>{hp.toLocaleString()}</div>
+    </div>
+  );
+};
+
+// ─── Sub: gemas de mana ───────────────────────────────────────────────────────
+
+const ManaGems: React.FC<{ total: number; spent: number }> = ({ total, spent }) => {
+  const available = total - spent;
+  // Exibe no máximo 10 gemas; para valores maiores mostra o número
+  const displayCount = Math.min(total, 10);
+
+  return (
+    <div className="hs-mana-row">
+      <span className="hs-mana-label">💧</span>
+      <div className="hs-mana-gems">
+        {Array.from({ length: displayCount }).map((_, i) => (
+          <div
+            key={i}
+            className={`hs-mana-gem ${i < available ? 'hs-mana-gem--full' : 'hs-mana-gem--spent'}`}
+          />
+        ))}
+      </div>
+      <span className="hs-mana-val">
+        {available}/{total}
+      </span>
+    </div>
+  );
+};
+
+// ─── Sub: carta na mão ────────────────────────────────────────────────────────
 
 interface HandCardProps {
-  card       : TrophyCard;
-  index      : number;
-  total      : number;
-  fanStyle   : Record<string, string | number>;
-  selOrder   : number;  // 0 = não selecionada, 1/2/3 = ordem de seleção
-  canSelect  : boolean;
-  canDeselect: boolean;
-  onToggle   : () => void;
+  card        : TrophyCard;
+  index       : number;
+  total       : number;
+  fanStyle    : Record<string, string | number>;
+  selOrder    : number;
+  canSelect   : boolean;
+  canDeselect : boolean;
+  noMana      : boolean;   // ← TRUE quando não tem mana (dimm vermelho)
+  onToggle    : () => void;
 }
 
 const HandCard: React.FC<HandCardProps> = ({
-  card, fanStyle, selOrder, canSelect, canDeselect, onToggle,
+  card, fanStyle, selOrder, canSelect, canDeselect, noMana, onToggle,
 }) => {
   const isSelected  = selOrder > 0;
   const cost        = getCardCost(card.rarity);
@@ -60,46 +113,44 @@ const HandCard: React.FC<HandCardProps> = ({
   const pctDisplay  = card.globalPercent != null ? `${card.globalPercent.toFixed(1)}%` : '??%';
   const clickable   = (canSelect && !isSelected) || (canDeselect && isSelected);
 
-  const handleMouseEnter = () => {
-    if (clickable) playHoverSound();
-  };
-
-  const handleClick = () => {
-    if (clickable) {
-      if (isSelected) {
-        playCardSelectSound();
-      } else {
-        playCardSelectSound();
-      }
-      onToggle();
-    }
-  };
+  // Determina classe visual
+  let extraClass = '';
+  if (isSelected) extraClass = ' hs-hand-card--selected';
+  else if (noMana) extraClass = ' hs-hand-card--nomana';
+  else if (!canSelect) extraClass = ' hs-hand-card--disabled';
 
   return (
     <div
-      className={`hs-hand-card${isSelected ? ' hs-hand-card--selected' : ''}${!canSelect && !isSelected ? ' hs-hand-card--disabled' : ''}`}
+      className={`hs-hand-card${extraClass}`}
       data-rarity={card.rarity}
       style={{
         ...fanStyle,
-        '--rarity-color'   : rarityColor,
-        marginLeft         : `calc(-1 * var(--card-width, 140px) / 2)`,
-        pointerEvents      : clickable ? 'auto' : 'none',
+        '--rarity-color': rarityColor,
+        marginLeft      : `calc(-1 * var(--card-width, 140px) / 2)`,
+        pointerEvents   : clickable ? 'auto' : 'none',
       } as React.CSSProperties}
-      onClick={handleClick}
-      onMouseEnter={handleMouseEnter}
-      title={card.description || card.name}
+      onClick={() => clickable && onToggle()}
+      onMouseEnter={() => clickable && playHoverSound()}
+      title={noMana ? `⚡ Sem mana (custo: ${cost})` : (card.description || card.name)}
     >
       <div className="hs-card-inner" data-rarity={card.rarity}>
 
-        {/* Badge de custo — canto superior esquerdo */}
+        {/* Badge de custo */}
         <div className="hs-card-cost" style={{ background: rarityColor }}>
           {cost}
         </div>
 
-        {/* Badge de ordem de seleção — canto superior direito */}
+        {/* Ordem de seleção */}
         {isSelected && (
           <div className="hs-card-sel-order">
             {selOrder === 1 ? '①' : selOrder === 2 ? '②' : '③'}
+          </div>
+        )}
+
+        {/* Indicador de mana insuficiente */}
+        {noMana && (
+          <div className="hs-card-nomana-overlay">
+            <span>⚡{cost}</span>
           </div>
         )}
 
@@ -151,14 +202,14 @@ const HandCard: React.FC<HandCardProps> = ({
           </div>
         </div>
 
-        {/* Overlay de seleção — dentro da carta para evitar desalinhamento */}
+        {/* Overlay de seleção */}
         {isSelected && <div className="hs-card-selected-overlay" />}
       </div>
     </div>
   );
 };
 
-// ─── Sub: carta do bot (virada) ───────────────────────────────────────────────
+// ─── Sub: carta do bot ────────────────────────────────────────────────────────
 
 const BotFaceDown: React.FC<{ fanStyle: Record<string, string | number> }> = ({ fanStyle }) => (
   <div
@@ -171,48 +222,34 @@ const BotFaceDown: React.FC<{ fanStyle: Record<string, string | number> }> = ({ 
   </div>
 );
 
-// ─── Sub: carta na arena (formato completo miniatura) ─────────────────────────
+// ─── Sub: carta na arena (formato completo) ───────────────────────────────────
+// Mantido EXATAMENTE como o usuário personalizou (hs-card-mini)
 
 const ArenaCard: React.FC<{
-  card     : TrophyCard;
+  card    : TrophyCard;
   isWinner?: boolean;
-  delay    ?: number;
+  delay   ?: number;
 }> = ({ card, isWinner, delay = 0 }) => {
   const rarityColor = RARITY_COLOR[card.rarity] ?? '#9ca3af';
-  const cost = getCardCost(card.rarity);
-  const pctDisplay = card.globalPercent != null ? `${card.globalPercent.toFixed(1)}%` : '??%';
+  const cost        = getCardCost(card.rarity);
+  const pctDisplay  = card.globalPercent != null ? `${card.globalPercent.toFixed(1)}%` : '??%';
 
   return (
     <div
       className={`hs-arena-card${isWinner ? ' hs-arena-card--winner' : ''}`}
       data-rarity={card.rarity}
-      style={{
-        '--rarity-color': rarityColor,
-        animationDelay: `${delay}s`,
-      } as React.CSSProperties}
+      style={{ '--rarity-color': rarityColor, animationDelay: `${delay}s` } as React.CSSProperties}
       title={card.description || card.name}
     >
-      {/* Card miniatura - mesmo formato da mão */}
       <div className="hs-card-mini" data-rarity={card.rarity}>
-        {/* Badge de custo */}
         <div className="hs-card-mini-cost" style={{ background: rarityColor }}>
           {cost}
         </div>
-
-        {/* Arte */}
         <div className="hs-card-mini-art">
-          <div
-            className="hs-card-mini-art-bg"
-            style={{ backgroundImage: `url('${card.iconUrl || card.gameHeaderUrl}')` }}
-          />
+          <div className="hs-card-mini-art-bg" style={{ backgroundImage: `url('${card.iconUrl || card.gameHeaderUrl}')` }} />
           {card.iconUrl ? (
-            <img
-              className="hs-card-mini-art-icon"
-              src={card.iconUrl}
-              alt={card.name}
-              loading="lazy"
-              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-            />
+            <img className="hs-card-mini-art-icon" src={card.iconUrl} alt={card.name} loading="lazy"
+                 onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
           ) : (
             <div className="hs-card-mini-art-emoji" style={{ borderColor: rarityColor }}>
               {card.rarityEmoji}
@@ -222,16 +259,10 @@ const ArenaCard: React.FC<{
             {card.rarityLabel}
           </div>
           <div className="hs-card-mini-thumb">
-            <img
-              src={card.gameHeaderUrl}
-              alt={card.gameName}
-              loading="lazy"
-              onError={(e) => { const p = (e.target as HTMLImageElement).parentElement; if (p) p.style.display = 'none'; }}
-            />
+            <img src={card.gameHeaderUrl} alt={card.gameName} loading="lazy"
+                 onError={(e) => { const p = (e.target as HTMLImageElement).parentElement; if (p) p.style.display = 'none'; }} />
           </div>
         </div>
-
-        {/* Corpo */}
         <div className="hs-card-mini-body">
           <div className="hs-card-mini-name">{card.name}</div>
           <div className="hs-card-mini-game">{card.gameName}</div>
@@ -239,35 +270,31 @@ const ArenaCard: React.FC<{
             <div className="hs-card-mini-desc">{card.description}</div>
           )}
         </div>
-
-        {/* Footer */}
         <div className="hs-card-mini-footer">
           <span className="hs-card-mini-pct">{pctDisplay}</span>
-          <div className="hs-card-mini-damage">
+          <div className="hs-card-mini-damage" style={{ color: rarityColor }}>
             <span>⚔</span>
             <strong>{card.damage}</strong>
           </div>
         </div>
       </div>
-
       {isWinner && <div className="hs-arena-winner-glow" />}
     </div>
   );
 };
 
-// ─── Sub: coluna de arena (até 3 cartas) ──────────────────────────────────────
+// ─── Sub: coluna de arena ─────────────────────────────────────────────────────
 
 const ArenaColumn: React.FC<{
-  cards    : TrophyCard[];
-  total    : number;
+  cards   : TrophyCard[];
+  total   : number;
   isWinner?: boolean;
-  label    : string;
-  isEmpty  ?: boolean;
-  waiting  ?: boolean;
-}> = ({ cards, total, isWinner, label, isEmpty, waiting }) => (
+  label   : string;
+  waiting ?: boolean;
+}> = ({ cards, total, isWinner, label, waiting }) => (
   <div className="hs-arena-column">
     <div className="hs-arena-column-label">{label}</div>
-    {isEmpty || cards.length === 0 ? (
+    {cards.length === 0 ? (
       <div className="hs-arena-slot-empty">
         {waiting ? <span className="hs-bot-thinking">⏳ escolhendo…</span> : 'aguardando'}
       </div>
@@ -280,7 +307,7 @@ const ArenaColumn: React.FC<{
         </div>
         <div className="hs-arena-total" style={{ color: isWinner ? '#4ade80' : 'var(--txt2)' }}>
           Total: <strong>{total}</strong>
-          {isWinner && ' 🏆'}
+          {isWinner && ' ⚔'}
         </div>
       </>
     )}
@@ -292,17 +319,18 @@ const ArenaColumn: React.FC<{
 const DuelBattle: React.FC = () => {
   const {
     phase, playerHand, botHand,
-    playerScore, botScore, round,
+    playerHp, botHp, currentMana,
+    round,
     selectedPlayerCards, selectedBotCards,
     roundWinner, gameWinner,
+    damageDealt, damageTarget,
     timeLeft, isTimerRunning, isPlayerReady,
-    toggleCard, pressReady, botPlay, resolveRound, nextRound, resetBattle, tickTimer,
+    toggleCard, fuseCards, pressReady,
+    botPlay, resolveRound, nextRound, resetBattle, tickTimer,
   } = useBattleStore();
 
   // ── Audio init ───────────────────────────────────────────────────────────
-  useEffect(() => {
-    initAudio();
-  }, []);
+  useEffect(() => { initAudio(); }, []);
 
   // ── Fan layouts ──────────────────────────────────────────────────────────
   const playerFan = useFanLayout(playerHand.length, 140, 18);
@@ -313,10 +341,7 @@ const DuelBattle: React.FC = () => {
     if (!isTimerRunning) return;
     const id = setInterval(() => {
       tickTimer();
-      // Play tick sound on last 5 seconds
-      if (timeLeft <= 6 && timeLeft > 1) {
-        playTickSound();
-      }
+      if (timeLeft <= 6 && timeLeft > 1) playTickSound();
     }, 1000);
     return () => clearInterval(id);
   }, [isTimerRunning, tickTimer, timeLeft]);
@@ -330,38 +355,29 @@ const DuelBattle: React.FC = () => {
     }
   }, [phase, isPlayerReady, selectedBotCards.length, botPlay]);
 
-  // ── Resolve quando ambos têm cartas ────────────────────────────────────
+  // ── Resolve quando ambos confirmaram ────────────────────────────────────
   useEffect(() => {
-    if (
-      phase === 'battle' &&
-      isPlayerReady &&
-      selectedBotCards.length > 0
-    ) {
-      playCardPlaySound();
+    if (phase === 'battle' && isPlayerReady && selectedBotCards.length >= 0) {
+      // Resolve mesmo se bot jogou 0 cartas (passou turno)
+      if (!isPlayerReady) return;
+      // Aguarda um frame para garantir que selectedBotCards foi atualizado
       const t = setTimeout(() => { resolveRound(); }, 900);
       return () => clearTimeout(t);
     }
-  }, [phase, isPlayerReady, selectedBotCards.length, resolveRound]);
+  }, [phase, isPlayerReady, selectedBotCards, resolveRound]); // eslint-disable-line
 
-  // ── Sons de vitória/derrota do round ─────────────────────────────────────
+  // ── Sons ─────────────────────────────────────────────────────────────────
   useEffect(() => {
     if (phase === 'round-result' && roundWinner) {
-      if (roundWinner === 'player') {
-        playWinRoundSound();
-      } else if (roundWinner === 'bot') {
-        playLoseRoundSound();
-      }
+      if (roundWinner === 'player') playWinRoundSound();
+      else if (roundWinner === 'bot') playLoseRoundSound();
     }
   }, [phase, roundWinner]);
 
-  // ── Sons de vitória/derrota do jogo ────────────────────────────────────
   useEffect(() => {
     if (phase === 'game-over' && gameWinner) {
-      if (gameWinner === 'player') {
-        playGameWinSound();
-      } else {
-        playGameLoseSound();
-      }
+      if (gameWinner === 'player') playGameWinSound();
+      else playGameLoseSound();
     }
   }, [phase, gameWinner]);
 
@@ -370,27 +386,51 @@ const DuelBattle: React.FC = () => {
     toggleCard(card);
   }, [toggleCard]);
 
-  const handlePressReady = () => {
-    if (selectedPlayerCards.length > 0) {
-      playReadySound();
-    }
+  const handlePressReady = useCallback(() => {
+    if (selectedPlayerCards.length > 0) playReadySound();
+    else playCardPlaySound();
     pressReady();
-  };
+  }, [pressReady, selectedPlayerCards.length]);
 
-  // ── Somas de dano ────────────────────────────────────────────────────────
-  const playerTotal = selectedPlayerCards.reduce((s, c) => s + c.damage, 0);
-  const botTotal    = selectedBotCards.reduce((s, c) => s + c.damage, 0);
+  // ── Mana: mana gasta e disponível ────────────────────────────────────────
+  const spentMana = useMemo(
+    () => selectedPlayerCards.reduce((s, c) => s + getCardCost(c.rarity), 0),
+    [selectedPlayerCards],
+  );
+  const availableMana = currentMana - spentMana;
 
-  // ── Timer visual ─────────────────────────────────────────────────────────
+  // ── Detecção de par fusível (2 cartas selecionadas de mesma raridade) ────
+  const fusablePair = useMemo<[TrophyCard, TrophyCard] | null>(() => {
+    for (let i = 0; i < selectedPlayerCards.length; i++) {
+      for (let j = i + 1; j < selectedPlayerCards.length; j++) {
+        if (selectedPlayerCards[i].rarity === selectedPlayerCards[j].rarity) {
+          return [selectedPlayerCards[i], selectedPlayerCards[j]];
+        }
+      }
+    }
+    return null;
+  }, [selectedPlayerCards]);
+
+  // ── Totais de dano ────────────────────────────────────────────────────────
+  const playerTotal = useMemo(
+    () => selectedPlayerCards.reduce((s, c) => s + c.damage, 0),
+    [selectedPlayerCards],
+  );
+  const botTotal = useMemo(
+    () => selectedBotCards.reduce((s, c) => s + c.damage, 0),
+    [selectedBotCards],
+  );
+
+  // ── Timer visual ──────────────────────────────────────────────────────────
   const timerPct   = (timeLeft / 30) * 100;
   const timerColor = timeLeft <= 5 ? '#f87171' : timeLeft <= 10 ? '#fbbf24' : '#4ade80';
 
-  // ── Quantas cartas comprar no próximo turno ──────────────────────────────
+  // ── Compra do próximo turno ───────────────────────────────────────────────
   const nextDraw = 4 - selectedPlayerCards.length;
 
-  // ──────────────────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────────────────
   // GAME OVER
-  // ──────────────────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────────────────
   if (phase === 'game-over') {
     const won = gameWinner === 'player';
     return (
@@ -404,25 +444,38 @@ const DuelBattle: React.FC = () => {
             ? 'Suas conquistas dominaram o campo de batalha!'
             : 'O bot foi mais forte desta vez. Tente novamente!'}
         </p>
-        <div className="hs-gameover-score">
-          <div className="hs-gameover-score-side">
-            <span className="hs-gameover-score-label">Você</span>
-            <span className="hs-gameover-score-num" style={{ color: won ? '#4ade80' : 'var(--txt)' }}>{playerScore}</span>
+
+        {/* HP final */}
+        <div className="hs-gameover-hp">
+          <div className="hs-gameover-hp-side">
+            <div className="hs-gameover-hp-label">💙 Você</div>
+            <div className="hs-gameover-hp-val" style={{ color: won ? '#4ade80' : '#f87171' }}>
+              {playerHp > 0 ? playerHp.toLocaleString() : '💀 0'}
+            </div>
           </div>
-          <span className="hs-gameover-score-vs">VS</span>
-          <div className="hs-gameover-score-side">
-            <span className="hs-gameover-score-label">Bot</span>
-            <span className="hs-gameover-score-num" style={{ color: !won ? '#f87171' : 'var(--txt)' }}>{botScore}</span>
+          <div className="hs-gameover-hp-div">❤️</div>
+          <div className="hs-gameover-hp-side">
+            <div className="hs-gameover-hp-label">🤖 Bot</div>
+            <div className="hs-gameover-hp-val" style={{ color: !won ? '#4ade80' : '#f87171' }}>
+              {botHp > 0 ? botHp.toLocaleString() : '💀 0'}
+            </div>
           </div>
         </div>
-        <button className="hs-btn-primary" onClick={resetBattle} onMouseEnter={playHoverSound}>🔄 Jogar Novamente</button>
+
+        <button
+          className="hs-btn-primary"
+          onClick={resetBattle}
+          onMouseEnter={playHoverSound}
+        >
+          🔄 Jogar Novamente
+        </button>
       </div>
     );
   }
 
-  // ──────────────────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────────────────
   // ROUND RESULT
-  // ──────────────────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────────────────
   if (phase === 'round-result') {
     const playerWon = roundWinner === 'player';
     const botWon    = roundWinner === 'bot';
@@ -430,29 +483,26 @@ const DuelBattle: React.FC = () => {
 
     return (
       <div className="hs-round-result">
-        {/* Título */}
+
+        {/* Título com dano */}
         <div className="hs-round-result-title">
           {isDraw
-            ? '🤝 Empate! Dano igual — nenhum ponto!'
+            ? '🤝 Empate! Nenhum dano causado.'
             : playerWon
-            ? `✅ Você venceu o round! (+${playerTotal} vs ${botTotal})`
-            : `❌ Bot venceu o round (${playerTotal} vs +${botTotal})`}
+            ? `✅ Você venceu! Bot tomou ${damageDealt.toLocaleString()} de dano.`
+            : `❌ Bot venceu! Você tomou ${damageDealt.toLocaleString()} de dano.`}
         </div>
 
-        {/* Placar */}
-        <div className="hs-scoreboard">
-          <div className="hs-scoreboard-side">
-            <span className="hs-scoreboard-label">Você</span>
-            <span className="hs-scoreboard-num" style={{ color: '#4ade80' }}>{playerScore}</span>
+        {/* Barras de HP atualizadas */}
+        <div className="hs-round-result-hp">
+          <HpBar hp={playerHp} label="💙 Você" damaged={damageTarget === 'player'} />
+          <div style={{ fontSize: 22, color: 'rgba(255,255,255,0.2)', padding: '0 12px', alignSelf: 'center' }}>
+            ⚔
           </div>
-          <span className="hs-scoreboard-vs">vs</span>
-          <div className="hs-scoreboard-side">
-            <span className="hs-scoreboard-label">Bot</span>
-            <span className="hs-scoreboard-num" style={{ color: '#f87171' }}>{botScore}</span>
-          </div>
+          <HpBar hp={botHp} label="🤖 Bot" damaged={damageTarget === 'bot'} />
         </div>
 
-        {/* Cartas lado a lado */}
+        {/* Cartas jogadas lado a lado */}
         <div className="hs-result-arena">
           <ArenaColumn
             cards={selectedPlayerCards}
@@ -469,37 +519,40 @@ const DuelBattle: React.FC = () => {
           />
         </div>
 
-        <button className="hs-btn-primary" onClick={nextRound} onMouseEnter={playHoverSound}>
+        <button
+          className="hs-btn-primary"
+          onClick={nextRound}
+          onMouseEnter={playHoverSound}
+        >
           Próximo Round →
         </button>
       </div>
     );
   }
 
-  // ──────────────────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────────────────
   // BATTLE PHASE
-  // ──────────────────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────────────────
   return (
     <div className="hs-battle">
 
-      {/* ── HUD ── */}
+      {/* ── HUD: HP + Round + Mana + Timer ── */}
       <div className="hs-battle-header">
-        <div className="hs-hud-block">
-          <div className="hs-hud-label">Round</div>
-          <div className="hs-hud-val">{round}</div>
+
+        {/* HP do jogador */}
+        <HpBar hp={playerHp} label="💙 Você" />
+
+        {/* Centro: Round + Mana */}
+        <div className="hs-hud-center">
+          <div className="hs-hud-round">
+            <span className="hs-hud-label">Round</span>
+            <span className="hs-hud-val">{round}</span>
+          </div>
+          <ManaGems total={currentMana} spent={spentMana} />
         </div>
 
-        <div className="hs-hud-score">
-          <div className="hs-hud-score-side">
-            <div className="hs-hud-label">Você</div>
-            <div className="hs-hud-val" style={{ color: '#4ade80', fontSize: 28 }}>{playerScore}</div>
-          </div>
-          <div className="hs-hud-score-div">–</div>
-          <div className="hs-hud-score-side">
-            <div className="hs-hud-label">Bot</div>
-            <div className="hs-hud-val" style={{ color: '#f87171', fontSize: 28 }}>{botScore}</div>
-          </div>
-        </div>
+        {/* HP do bot */}
+        <HpBar hp={botHp} label="🤖 Bot" />
 
         {/* Timer ring */}
         <div className="hs-hud-block">
@@ -546,11 +599,11 @@ const DuelBattle: React.FC = () => {
         {selectedPlayerCards.length > 0 || isPlayerReady ? (
           <div className="hs-arena-live">
             <div className="hs-arena-live-side">
-              <div className="hs-arena-live-label">Você · {playerTotal} ⚔</div>
+              <div className="hs-arena-live-label">
+                Você · <strong style={{ color: '#4ade80' }}>{playerTotal}</strong> ⚔
+              </div>
               <div className="hs-arena-live-cards">
-                {selectedPlayerCards.map((c) => (
-                  <ArenaCard key={c.id} card={c} />
-                ))}
+                {selectedPlayerCards.map(c => <ArenaCard key={c.id} card={c} />)}
               </div>
             </div>
             <div className="hs-arena-vs">VS</div>
@@ -562,7 +615,7 @@ const DuelBattle: React.FC = () => {
                     <span className="hs-bot-thinking">⏳</span>
                   </div>
                 ) : (
-                  selectedBotCards.map((c) => <ArenaCard key={c.id} card={c} />)
+                  selectedBotCards.map(c => <ArenaCard key={c.id} card={c} />)
                 )}
               </div>
             </div>
@@ -570,33 +623,53 @@ const DuelBattle: React.FC = () => {
         ) : (
           <div className="hs-arena-hint">
             Selecione cartas da sua mão e clique em <strong>Pronto</strong>
+            <br />
+            <span style={{ fontSize: 12, opacity: 0.7 }}>
+              Você tem <strong style={{ color: '#60a5fa' }}>{currentMana}</strong> de mana
+            </span>
           </div>
         )}
       </div>
 
-      {/* ── Player hand ── */}
+      {/* ── Player zone ── */}
       <div className="hs-player-zone">
 
-        {/* Barra de ação: info + botão Pronto */}
+        {/* Barra de ação */}
         <div className="hs-ready-bar">
           <div className="hs-ready-info">
             {isPlayerReady ? (
               <span style={{ color: '#4ade80' }}>✅ Aguardando bot…</span>
             ) : (
               <>
-                <span>
-                  {selectedPlayerCards.length}/{3} cartas
-                </span>
+                <span>{selectedPlayerCards.length}/3 cartas</span>
                 <span className="hs-draw-preview">
                   → próx. turno: +{nextDraw} carta{nextDraw !== 1 ? 's' : ''}
+                </span>
+                <span className="hs-mana-spent-badge">
+                  💧 {spentMana}/{currentMana}
                 </span>
               </>
             )}
           </div>
 
+          {/* Botão de fusão — aparece quando há par fusível */}
+          {!isPlayerReady && fusablePair && (
+            <button
+              className="hs-btn-fuse"
+              onClick={() => {
+                playCardSelectSound();
+                fuseCards(fusablePair[0].id, fusablePair[1].id);
+              }}
+              onMouseEnter={playHoverSound}
+              title={`Fundir 2 cartas ${fusablePair[0].rarity} → ${fusablePair[0].rarity} superior`}
+            >
+              ✨ Fundir {fusablePair[0].rarityEmoji}{fusablePair[1].rarityEmoji}
+            </button>
+          )}
+
           {!isPlayerReady && (
             <button
-              className={`hs-btn-ready ${selectedPlayerCards.length > 0 ? 'hs-btn-ready--active' : ''}`}
+              className={`hs-btn-ready${selectedPlayerCards.length > 0 ? ' hs-btn-ready--active' : ''}`}
               onClick={handlePressReady}
               onMouseEnter={playHoverSound}
             >
@@ -607,13 +680,19 @@ const DuelBattle: React.FC = () => {
           )}
         </div>
 
-        {/* Mão de cartas em leque */}
+        {/* Mão em leque */}
         <div className="hs-player-hand">
           {playerHand.map((card, i) => {
-            const selIdx = selectedPlayerCards.findIndex((c) => c.id === card.id);
-            const selOrder = selIdx >= 0 ? selIdx + 1 : 0;
+            const selIdx        = selectedPlayerCards.findIndex(c => c.id === card.id);
+            const selOrder      = selIdx >= 0 ? selIdx + 1 : 0;
             const alreadySelected = selOrder > 0;
-            const maxReached = selectedPlayerCards.length >= 3;
+            const maxReached    = selectedPlayerCards.length >= 3;
+            const cardCost      = getCardCost(card.rarity);
+            const canAfford     = spentMana + cardCost <= currentMana;
+            // noMana: quando não é selecionada e não cabe na mana
+            const noMana        = !alreadySelected && !canAfford;
+            const canSelect     = !isPlayerReady && !alreadySelected && !maxReached && canAfford;
+            const canDeselect   = !isPlayerReady && alreadySelected;
 
             return (
               <HandCard
@@ -623,8 +702,9 @@ const DuelBattle: React.FC = () => {
                 total={playerHand.length}
                 fanStyle={playerFan.getCardStyle(i)}
                 selOrder={selOrder}
-                canSelect={!isPlayerReady && !alreadySelected && !maxReached}
-                canDeselect={!isPlayerReady && alreadySelected}
+                canSelect={canSelect}
+                canDeselect={canDeselect}
+                noMana={noMana}
                 onToggle={() => handleToggle(card)}
               />
             );

@@ -1,14 +1,17 @@
 // ─────────────────────────────────────────────────────────────────────────────
-//  src/store/useBattleStore.ts  (v2)
+//  src/store/useBattleStore.ts  (v3)
 //
-//  Novidades vs versão anterior:
-//    - Seleção de ATÉ 3 cartas por turno (array em vez de card único)
-//    - Timer de 30 segundos
-//    - Botão "Pronto" → pressReady()
-//    - Sistema de compra de cartas: 4 - cartas_jogadas (0→4, 1→3, 2→2, 3→1)
-//    - resolveRound() compara SOMA dos danos
-//    - Bot também joga 1-3 cartas aleatórias
-//    - Custo de carta por raridade (display): common=1 uncommon=2 rare=3 epic=4 legendary=mythic=5
+//  Novas mecânicas:
+//    - Sistema de HP: ambos começam com 3500. O vencedor do round causa o
+//      dano EXCEDENTE no adversário (ex: 1230 vs 1500 → player toma 270).
+//    - Sistema de Mana: começa com 3 no turno 1, +1 a cada turno.
+//      Não é possível selecionar cartas se o custo total ultrapassar a mana.
+//    - Fusão: fuseCards(id1, id2) — une duas cartas de mesma raridade em
+//      uma carta de raridade superior. Conta como 1 carta jogada no cálculo
+//      de compra.
+//    - Bot respeita a mana ao escolher cartas.
+//    - Cálculo de compra: 1 + espaços_vazios = 4 - cartas_jogadas (sem mudança
+//      na fórmula, mas a semântica agora é explícita via cardsPlayedThisRound).
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { create } from 'zustand';
@@ -18,7 +21,8 @@ import type { Game, Achievement } from '../types';
 export type BattlePhase = 'select-deck' | 'battle' | 'round-result' | 'game-over';
 export type BotDifficulty = 'easy' | 'normal' | 'hard' | 'king';
 
-/** Custo de cada raridade (exibição / estratégia — sem sistema de mana por enquanto) */
+// ─── Custo por raridade ───────────────────────────────────────────────────────
+
 export const CARD_COST: Record<string, number> = {
   common   : 1,
   uncommon : 2,
@@ -32,69 +36,101 @@ export function getCardCost(rarity: string): number {
   return CARD_COST[rarity] ?? 1;
 }
 
+// ─── Progressão de raridade para fusão ────────────────────────────────────────
+
+const RARITY_ORDER: RarityName[] = [
+  'common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic',
+];
+
+const RARITY_INFO: Record<string, { label: string; emoji: string }> = {
+  common   : { label: '● Common',    emoji: '⚪' },
+  uncommon : { label: '○ Uncommon',  emoji: '🟢' },
+  rare     : { label: '◇ Rare',      emoji: '🔷' },
+  epic     : { label: '◆ Epic',      emoji: '💎' },
+  legendary: { label: '★ Legendary', emoji: '🏆' },
+  mythic   : { label: '✦ Mythic',    emoji: '🌟' },
+};
+
+function getNextRarity(rarity: string): RarityName {
+  const idx = RARITY_ORDER.indexOf(rarity as RarityName);
+  if (idx === -1) return 'uncommon';
+  return RARITY_ORDER[Math.min(idx + 1, RARITY_ORDER.length - 1)];
+}
+
+// ─── Constantes ───────────────────────────────────────────────────────────────
+
 const MAX_CARDS_PER_TURN = 3;
 const TIMER_SECONDS      = 30;
+const INITIAL_HP         = 3500;
+const INITIAL_MANA       = 3;
+
+// ─── Tipos ────────────────────────────────────────────────────────────────────
 
 interface BattleState {
-  phase              : BattlePhase;
-  playerDeck         : TrophyCard[];
-  botDeck            : TrophyCard[];
-  playerHand         : TrophyCard[];
-  botHand            : TrophyCard[];
-  playerScore        : number;
-  botScore           : number;
-  round              : number;
-  /** Cartas que o jogador escolheu para jogar neste turno (máx 3) */
-  selectedPlayerCards : TrophyCard[];
-  /** Cartas que o bot escolheu */
-  selectedBotCards    : TrophyCard[];
-  roundWinner        : 'player' | 'bot' | 'draw' | null;
-  gameWinner         : 'player' | 'bot' | null;
-  timeLeft           : number;
-  isTimerRunning     : boolean;
-  /** Jogador confirmou a seleção */
-  isPlayerReady      : boolean;
-  /** Guarda contra double-resolve */
-  isResolving        : boolean;
-  /** Quantas cartas o player jogará no próximo turno de compra */
+  phase               : BattlePhase;
+  playerDeck          : TrophyCard[];
+  botDeck             : TrophyCard[];
+  playerHand          : TrophyCard[];
+  botHand             : TrophyCard[];
+  /** HP do jogador (começa em 3500) */
+  playerHp            : number;
+  /** HP do bot (começa em 3500) */
+  botHp               : number;
+  /** Mana atual (começa em 3, +1 por turno) */
+  currentMana         : number;
+  round               : number;
+  selectedPlayerCards  : TrophyCard[];
+  selectedBotCards     : TrophyCard[];
+  roundWinner          : 'player' | 'bot' | 'draw' | null;
+  gameWinner           : 'player' | 'bot' | null;
+  /** Dano excedente causado neste round (para exibição) */
+  damageDealt          : number;
+  /** Quem recebeu o dano */
+  damageTarget         : 'player' | 'bot' | null;
+  timeLeft             : number;
+  isTimerRunning       : boolean;
+  isPlayerReady        : boolean;
+  isResolving          : boolean;
   cardsPlayedThisRound : number;
-  /** Dificuldade do bot */
-  botDifficulty      : BotDifficulty;
+  botDifficulty        : BotDifficulty;
 }
 
 interface BattleActions {
-  startBattle  : (playerDeck: TrophyCard[], playerGames: Game[], difficulty?: BotDifficulty) => void;
-  /** Toggle uma carta na seleção (adiciona se não está, remove se está) */
-  toggleCard   : (card: TrophyCard) => void;
-  /** Jogador confirma a seleção e passa o turno */
-  pressReady   : () => void;
-  botPlay      : () => void;
-  resolveRound : () => void;
-  nextRound    : () => void;
-  resetBattle  : () => void;
-  tickTimer    : () => void;
-  setBotDifficulty: (difficulty: BotDifficulty) => void;
+  startBattle   : (playerDeck: TrophyCard[], playerGames: Game[], difficulty?: BotDifficulty) => void;
+  toggleCard    : (card: TrophyCard) => void;
+  pressReady    : () => void;
+  botPlay       : () => void;
+  resolveRound  : () => void;
+  nextRound     : () => void;
+  resetBattle   : () => void;
+  tickTimer     : () => void;
+  setBotDifficulty: (d: BotDifficulty) => void;
+  /** Funde duas cartas de mesma raridade em uma de raridade superior */
+  fuseCards     : (card1Id: string, card2Id: string) => void;
 }
 
 const INITIAL_STATE: BattleState = {
-  phase              : 'select-deck',
-  playerDeck         : [],
-  botDeck            : [],
-  playerHand         : [],
-  botHand            : [],
-  playerScore        : 0,
-  botScore           : 0,
-  round              : 1,
-  selectedPlayerCards : [],
-  selectedBotCards    : [],
-  roundWinner        : null,
-  gameWinner         : null,
-  timeLeft           : TIMER_SECONDS,
-  isTimerRunning     : false,
-  isPlayerReady      : false,
-  isResolving        : false,
-  cardsPlayedThisRound: 0,
-  botDifficulty      : 'normal',
+  phase               : 'select-deck',
+  playerDeck          : [],
+  botDeck             : [],
+  playerHand          : [],
+  botHand             : [],
+  playerHp            : INITIAL_HP,
+  botHp               : INITIAL_HP,
+  currentMana         : INITIAL_MANA,
+  round               : 1,
+  selectedPlayerCards  : [],
+  selectedBotCards     : [],
+  roundWinner          : null,
+  gameWinner           : null,
+  damageDealt          : 0,
+  damageTarget         : null,
+  timeLeft             : TIMER_SECONDS,
+  isTimerRunning       : false,
+  isPlayerReady        : false,
+  isResolving          : false,
+  cardsPlayedThisRound : 0,
+  botDifficulty        : 'normal',
 };
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -109,13 +145,13 @@ function shuffleArray<T>(array: T[]): T[] {
 }
 
 function drawCards(
-  deck  : TrophyCard[],
-  count : number,
+  deck : TrophyCard[],
+  count: number,
 ): { drawn: TrophyCard[]; remaining: TrophyCard[] } {
   if (deck.length === 0 || count <= 0) return { drawn: [], remaining: [...deck] };
-  const shuffled = shuffleArray(deck);
-  const n = Math.min(count, shuffled.length);
-  return { drawn: shuffled.slice(0, n), remaining: shuffled.slice(n) };
+  const s = shuffleArray(deck);
+  const n = Math.min(count, s.length);
+  return { drawn: s.slice(0, n), remaining: s.slice(n) };
 }
 
 function calcDamage(globalPercent: number): number {
@@ -154,45 +190,37 @@ const GAME_HEADERS: Record<number, string> = {
   620    : 'https://cdn.akamai.steamstatic.com/steam/apps/620/header.jpg',
 };
 
-const SYNTHETIC: Array<{ name: string; description: string; gameName: string; gameAppId: number; rarity: string }> = [
-  { name: 'First Blood',    description: 'Complete o tutorial',      gameName: 'Counter-Strike 2', gameAppId: 730,     rarity: 'common'    },
-  { name: 'Rookie',         description: 'Vença sua primeira partida', gameName: 'Rocket League',   gameAppId: 252950,  rarity: 'common'    },
-  { name: 'Explorer',       description: 'Visite todos os mapas',    gameName: 'Rust',              gameAppId: 252490,  rarity: 'common'    },
-  { name: 'Craftsman',      description: 'Fabrique seu primeiro item', gameName: 'Terraria',         gameAppId: 105600,  rarity: 'common'    },
-  { name: 'Veteran',        description: 'Alcance nível 25',         gameName: 'Counter-Strike 2', gameAppId: 730,     rarity: 'uncommon'  },
-  { name: 'Champion',       description: 'Vença 10 partidas',        gameName: 'Team Fortress 2',  gameAppId: 440,     rarity: 'uncommon'  },
-  { name: 'Ace',            description: 'Marque 50 gols',           gameName: 'Rocket League',    gameAppId: 252950,  rarity: 'uncommon'  },
-  { name: 'Elite',          description: 'Alcance nível 50',         gameName: 'Counter-Strike 2', gameAppId: 730,     rarity: 'rare'      },
-  { name: 'Grand Champion', description: 'Alcance rank Grand Champion', gameName: 'Rocket League', gameAppId: 252950,  rarity: 'rare'      },
-  { name: 'Legend',         description: 'Vença 100 partidas',       gameName: 'Team Fortress 2',  gameAppId: 440,     rarity: 'rare'      },
-  { name: 'Godlike',        description: 'Alcance nível 100',        gameName: 'Counter-Strike 2', gameAppId: 730,     rarity: 'epic'      },
-  { name: 'Immortal',       description: 'Vença 500 partidas',       gameName: 'Dota 2',            gameAppId: 570,     rarity: 'epic'      },
-  { name: 'Global Elite',   description: 'Alcance rank Global Elite', gameName: 'Counter-Strike 2', gameAppId: 730,     rarity: 'legendary' },
-  { name: 'Rocket God',     description: 'Vença 5000 partidas',      gameName: 'Rocket League',    gameAppId: 252950,  rarity: 'legendary' },
-  { name: 'The One',        description: 'Complete o impossível',    gameName: 'Half-Life 2',      gameAppId: 220,     rarity: 'mythic'    },
-  { name: 'Steam God',      description: 'Colete todos os itens raros', gameName: 'Portal 2',       gameAppId: 620,     rarity: 'mythic'    },
+const SYNTHETIC: Array<{
+  name: string; description: string; gameName: string; gameAppId: number; rarity: string;
+}> = [
+  { name: 'First Blood',    description: 'Complete o tutorial',         gameName: 'Counter-Strike 2', gameAppId: 730,     rarity: 'common'    },
+  { name: 'Rookie',         description: 'Vença sua primeira partida',  gameName: 'Rocket League',    gameAppId: 252950,  rarity: 'common'    },
+  { name: 'Explorer',       description: 'Visite todos os mapas',       gameName: 'Rust',             gameAppId: 252490,  rarity: 'common'    },
+  { name: 'Craftsman',      description: 'Fabrique seu primeiro item',  gameName: 'Terraria',         gameAppId: 105600,  rarity: 'common'    },
+  { name: 'Veteran',        description: 'Alcance nível 25',            gameName: 'Counter-Strike 2', gameAppId: 730,     rarity: 'uncommon'  },
+  { name: 'Champion',       description: 'Vença 10 partidas',           gameName: 'Team Fortress 2',  gameAppId: 440,     rarity: 'uncommon'  },
+  { name: 'Ace',            description: 'Marque 50 gols',              gameName: 'Rocket League',    gameAppId: 252950,  rarity: 'uncommon'  },
+  { name: 'Elite',          description: 'Alcance nível 50',            gameName: 'Counter-Strike 2', gameAppId: 730,     rarity: 'rare'      },
+  { name: 'Grand Champion', description: 'Alcance rank Grand Champion', gameName: 'Rocket League',    gameAppId: 252950,  rarity: 'rare'      },
+  { name: 'Legend',         description: 'Vença 100 partidas',          gameName: 'Team Fortress 2',  gameAppId: 440,     rarity: 'rare'      },
+  { name: 'Godlike',        description: 'Alcance nível 100',           gameName: 'Counter-Strike 2', gameAppId: 730,     rarity: 'epic'      },
+  { name: 'Immortal',       description: 'Vença 500 partidas',          gameName: 'Dota 2',           gameAppId: 570,     rarity: 'epic'      },
+  { name: 'Global Elite',   description: 'Alcance rank Global Elite',   gameName: 'Counter-Strike 2', gameAppId: 730,     rarity: 'legendary' },
+  { name: 'Rocket God',     description: 'Vença 5000 partidas',         gameName: 'Rocket League',    gameAppId: 252950,  rarity: 'legendary' },
+  { name: 'The One',        description: 'Complete o impossível',       gameName: 'Half-Life 2',      gameAppId: 220,     rarity: 'mythic'    },
+  { name: 'Steam God',      description: 'Colete todos os itens raros', gameName: 'Portal 2',         gameAppId: 620,     rarity: 'mythic'    },
 ];
 
-/** Filtra cartas por dificuldade */
 function filterCardsByDifficulty(cards: TrophyCard[], difficulty: BotDifficulty): TrophyCard[] {
   switch (difficulty) {
-    case 'easy':
-      // Fácil: até Epic (sem Legendary/Mythic)
-      return cards.filter(c => ['common', 'uncommon', 'rare', 'epic'].includes(c.rarity));
-    case 'hard':
-      // Difícil: apenas Rare+ (raras, épicas, lendárias, míticas)
-      return cards.filter(c => ['rare', 'epic', 'legendary', 'mythic'].includes(c.rarity));
-    case 'king':
-      // Rei dos Troféus: apenas Legendary e Mythic
-      return cards.filter(c => ['legendary', 'mythic'].includes(c.rarity));
-    case 'normal':
-    default:
-      return cards;
+    case 'easy':   return cards.filter(c => ['common', 'uncommon', 'rare', 'epic'].includes(c.rarity));
+    case 'hard':   return cards.filter(c => ['rare', 'epic', 'legendary', 'mythic'].includes(c.rarity));
+    case 'king':   return cards.filter(c => ['legendary', 'mythic'].includes(c.rarity));
+    default:       return cards;
   }
 }
 
 function buildBotDeck(playerGames: Game[], difficulty: BotDifficulty = 'normal'): TrophyCard[] {
-  // Preferência: usar conquistas reais do jogador como deck do bot
   const pool: Array<{ achievement: Achievement; game: Game }> = [];
   for (const game of playerGames) {
     for (const ach of game.achievements) {
@@ -200,95 +228,46 @@ function buildBotDeck(playerGames: Game[], difficulty: BotDifficulty = 'normal')
     }
   }
 
-  let cards: TrophyCard[] = [];
+  let cards: TrophyCard[];
 
   if (pool.length >= 10) {
     const shuffled = shuffleArray(pool);
-    const count    = Math.min(20, shuffled.length);
-    cards = shuffled.slice(0, count).map(({ achievement, game }, i) => {
+    cards = shuffled.slice(0, Math.min(20, shuffled.length)).map(({ achievement, game }, i) => {
       const pct    = achievement.globalPercent ?? (Math.random() * 60 + 5);
       const damage = calcDamage(pct);
       const r      = getRarity(damage);
       return {
-        id           : `bot-${i}`,
-        apiName      : achievement.apiName,
-        name         : achievement.displayName,
-        description  : achievement.description,
-        iconUrl      : achievement.iconUrl,
-        gameAppId    : game.appId,
-        gameName     : game.name,
+        id: `bot-${i}`, apiName: achievement.apiName,
+        name: achievement.displayName, description: achievement.description,
+        iconUrl: achievement.iconUrl, gameAppId: game.appId, gameName: game.name,
         gameHeaderUrl: game.headerImage,
-        damage, globalPercent: pct,
-        rarity: r.name, rarityLabel: r.label, rarityEmoji: r.emoji,
+        damage, globalPercent: pct, rarity: r.name, rarityLabel: r.label, rarityEmoji: r.emoji,
       } satisfies TrophyCard;
     });
   } else {
-    // Fallback sintético
-    // Filtrar por dificuldade
-    let syntheticPool = [...SYNTHETIC];
-    if (difficulty === 'easy') {
-      // Fácil: apenas até Epic (sem Legendary/Mythic)
-      syntheticPool = syntheticPool.filter(a => ['common', 'uncommon', 'rare', 'epic'].includes(a.rarity));
-    } else if (difficulty === 'hard') {
-      syntheticPool = syntheticPool.filter(a => ['rare', 'epic', 'legendary', 'mythic'].includes(a.rarity));
-    } else if (difficulty === 'king') {
-      syntheticPool = syntheticPool.filter(a => ['legendary', 'mythic'].includes(a.rarity));
-    }
-    
-    const shuffled = shuffleArray(syntheticPool.length > 0 ? syntheticPool : SYNTHETIC).slice(0, 16);
-    cards = shuffled.map((ach, i) => {
+    let pool2 = [...SYNTHETIC];
+    if (difficulty === 'easy')   pool2 = pool2.filter(a => ['common', 'uncommon', 'rare', 'epic'].includes(a.rarity));
+    else if (difficulty === 'hard') pool2 = pool2.filter(a => ['rare', 'epic', 'legendary', 'mythic'].includes(a.rarity));
+    else if (difficulty === 'king') pool2 = pool2.filter(a => ['legendary', 'mythic'].includes(a.rarity));
+    if (pool2.length === 0) pool2 = [...SYNTHETIC];
+
+    cards = shuffleArray(pool2).slice(0, 16).map((ach, i) => {
       const [min, max] = RARITY_PCT[ach.rarity];
       const pct    = Math.random() * (max - min) + min;
       const damage = calcDamage(pct);
       const r      = getRarity(damage);
       return {
-        id           : `bot-synth-${i}`,
-        apiName      : ach.name.toLowerCase().replace(/\s+/g, '_'),
-        name         : ach.name,
-        description  : ach.description,
-        iconUrl      : '',
-        gameAppId    : ach.gameAppId,
-        gameName     : ach.gameName,
+        id: `bot-synth-${i}`, apiName: ach.name.toLowerCase().replace(/\s+/g, '_'),
+        name: ach.name, description: ach.description, iconUrl: '',
+        gameAppId: ach.gameAppId, gameName: ach.gameName,
         gameHeaderUrl: GAME_HEADERS[ach.gameAppId] ?? '',
-        damage, globalPercent: pct,
-        rarity: r.name, rarityLabel: r.label, rarityEmoji: r.emoji,
+        damage, globalPercent: pct, rarity: r.name, rarityLabel: r.label, rarityEmoji: r.emoji,
       } satisfies TrophyCard;
     });
   }
 
-  // Aplicar filtro de dificuldade
   const filtered = filterCardsByDifficulty(cards, difficulty);
-  
-  // Só retorna as cartas filtradas, sem adicionar cartas de raridade proibida de volta
-  // Mesmo que o deck fique menor, respeitamos a dificuldade escolhida
-  if (filtered.length > 0) {
-    return shuffleArray(filtered);
-  }
-  
-  // Se não sobrou nenhuma carta após filtrar, gera cartas sintéticas adequadas
-  if (difficulty === 'easy') {
-    const easyPool = SYNTHETIC.filter(a => ['common', 'uncommon', 'rare'].includes(a.rarity));
-    return shuffleArray(easyPool).slice(0, 10).map((ach, i) => {
-      const [min, max] = RARITY_PCT[ach.rarity];
-      const pct = Math.random() * (max - min) + min;
-      const damage = calcDamage(pct);
-      const r = getRarity(damage);
-      return {
-        id: `bot-easy-${i}`,
-        apiName: ach.name.toLowerCase().replace(/\s+/g, '_'),
-        name: ach.name,
-        description: ach.description,
-        iconUrl: '',
-        gameAppId: ach.gameAppId,
-        gameName: ach.gameName,
-        gameHeaderUrl: GAME_HEADERS[ach.gameAppId] ?? '',
-        damage, globalPercent: pct,
-        rarity: r.name, rarityLabel: r.label, rarityEmoji: r.emoji,
-      } satisfies TrophyCard;
-    });
-  }
-  
-  return cards;
+  return shuffleArray(filtered.length > 0 ? filtered : cards);
 }
 
 // ─── Store ────────────────────────────────────────────────────────────────────
@@ -296,13 +275,10 @@ function buildBotDeck(playerGames: Game[], difficulty: BotDifficulty = 'normal')
 export const useBattleStore = create<BattleState & BattleActions>((set, get) => ({
   ...INITIAL_STATE,
 
-  // ── Reset ──────────────────────────────────────────────────────────────
-  resetBattle: () => set(INITIAL_STATE),
+  resetBattle    : () => set({ ...INITIAL_STATE }),
+  setBotDifficulty: (d) => set({ botDifficulty: d }),
 
-  // ── Set difficulty ──────────────────────────────────────────────────────
-  setBotDifficulty: (difficulty) => set({ botDifficulty: difficulty }),
-
-  // ── Start ────────────────────────────────────────────────────────────────
+  // ── Start ──────────────────────────────────────────────────────────────────
   startBattle: (playerDeck, playerGames, difficulty = 'normal') => {
     const botDeck    = buildBotDeck(playerGames, difficulty);
     const playerDraw = drawCards(playerDeck, 5);
@@ -316,109 +292,187 @@ export const useBattleStore = create<BattleState & BattleActions>((set, get) => 
       botDeck            : botDraw.remaining,
       playerHand         : playerDraw.drawn,
       botHand            : botDraw.drawn,
+      playerHp           : INITIAL_HP,
+      botHp              : INITIAL_HP,
+      currentMana        : INITIAL_MANA,
       timeLeft           : TIMER_SECONDS,
       isTimerRunning     : true,
     });
   },
 
-  // ── Toggle card in/out of selection ──────────────────────────────────────
+  // ── Toggle carta — bloqueia se custo ultrapassa mana ─────────────────────
   toggleCard: (card) => {
-    const { selectedPlayerCards, isPlayerReady, phase } = get();
-
-    // Só permite seleção durante a fase de batalha e antes de confirmar
+    const { selectedPlayerCards, isPlayerReady, phase, currentMana } = get();
     if (phase !== 'battle' || isPlayerReady) return;
 
-    const isSelected = selectedPlayerCards.some((c) => c.id === card.id);
+    const isSelected = selectedPlayerCards.some(c => c.id === card.id);
 
     if (isSelected) {
-      // Remove da seleção
-      set({ selectedPlayerCards: selectedPlayerCards.filter((c) => c.id !== card.id) });
+      // Deseleção sempre permitida
+      set({ selectedPlayerCards: selectedPlayerCards.filter(c => c.id !== card.id) });
     } else if (selectedPlayerCards.length < MAX_CARDS_PER_TURN) {
-      // Adiciona à seleção (máx 3)
-      set({ selectedPlayerCards: [...selectedPlayerCards, card] });
+      // Verifica se há mana suficiente
+      const spentMana = selectedPlayerCards.reduce((s, c) => s + getCardCost(c.rarity), 0);
+      const cardCost  = getCardCost(card.rarity);
+      if (spentMana + cardCost <= currentMana) {
+        set({ selectedPlayerCards: [...selectedPlayerCards, card] });
+      }
+      // Se não tem mana, ignora silenciosamente (UI já dimma a carta)
     }
   },
 
-  // ── Pronto: jogador confirma seleção ─────────────────────────────────────
+  // ── Fundir duas cartas de mesma raridade ─────────────────────────────────
+  fuseCards: (card1Id, card2Id) => {
+    const { selectedPlayerCards, playerHand, phase, isPlayerReady } = get();
+    if (phase !== 'battle' || isPlayerReady) return;
+
+    const card1 = selectedPlayerCards.find(c => c.id === card1Id);
+    const card2 = selectedPlayerCards.find(c => c.id === card2Id);
+    if (!card1 || !card2 || card1.rarity !== card2.rarity) return;
+
+    // Determina a raridade resultante
+    const nextRarity = getNextRarity(card1.rarity);
+    const rarityInfo = RARITY_INFO[nextRarity];
+
+    // Carta base: a mais forte das duas
+    const base = card1.damage >= card2.damage ? card1 : card2;
+
+    // Dano da carta fundida: soma das duas com 85% de eficiência
+    // (ligeiramente abaixo da soma para não dominar demais)
+    const fusedDamage = Math.round((card1.damage + card2.damage) * 0.85);
+
+    const fusedCard: TrophyCard = {
+      id           : `fused-${Date.now()}`,
+      apiName      : `fused_${base.apiName}`,
+      name         : `✨ ${base.name}`,
+      description  : `Fusão: ${card1.name} + ${card2.name}`,
+      iconUrl      : base.iconUrl,
+      gameAppId    : base.gameAppId,
+      gameName     : base.gameName,
+      gameHeaderUrl: base.gameHeaderUrl,
+      damage       : fusedDamage,
+      rarity       : nextRarity,
+      rarityLabel  : rarityInfo.label,
+      rarityEmoji  : rarityInfo.emoji,
+      globalPercent: null,
+    };
+
+    // Remove as duas cartas originais da mão e da seleção
+    const newHand     = playerHand.filter(c => c.id !== card1Id && c.id !== card2Id);
+    const newSelected = selectedPlayerCards
+      .filter(c => c.id !== card1Id && c.id !== card2Id)
+      .concat(fusedCard);
+
+    set({
+      playerHand          : [...newHand, fusedCard],
+      selectedPlayerCards : newSelected,
+    });
+  },
+
+  // ── Pronto ────────────────────────────────────────────────────────────────
   pressReady: () => {
     const { phase, isPlayerReady } = get();
     if (phase !== 'battle' || isPlayerReady) return;
 
     set({
-      isPlayerReady  : true,
-      isTimerRunning : false,
-      cardsPlayedThisRound: get().selectedPlayerCards.length,
+      isPlayerReady        : true,
+      isTimerRunning       : false,
+      cardsPlayedThisRound : get().selectedPlayerCards.length,
     });
 
-    // Bot joga após pequeno delay
     setTimeout(() => { get().botPlay(); }, 400);
   },
 
-  // ── Bot escolhe cartas ────────────────────────────────────────────────────
+  // ── Bot escolhe cartas respeitando mana ──────────────────────────────────
   botPlay: () => {
-    const { botHand, selectedBotCards, botDifficulty } = get();
+    const { botHand, selectedBotCards, botDifficulty, currentMana } = get();
     if (selectedBotCards.length > 0 || botHand.length === 0) return;
 
-    // Regras por dificuldade
-    const maxCards = botDifficulty === 'easy' ? 2 : MAX_CARDS_PER_TURN; // Fácil: max 2 cartas
-    const maxBot = Math.min(maxCards, botHand.length);
-    
-    // Bot inteligente (hard/king) tenta escolher cartas mais fortes
+    const maxCards = botDifficulty === 'easy' ? 2 : MAX_CARDS_PER_TURN;
     let chosen: TrophyCard[];
+
     if (botDifficulty === 'hard' || botDifficulty === 'king') {
-      // Ordena por dano (maior primeiro) e escolhe as melhores
+      // Bot inteligente: escolhe as cartas mais fortes dentro do orçamento de mana
       const sorted = [...botHand].sort((a, b) => b.damage - a.damage);
-      const count = Math.min(maxBot, Math.floor(Math.random() * 2) + 2); // 2-3 cartas
-      chosen = sorted.slice(0, count);
+      chosen = [];
+      let spent = 0;
+      for (const c of sorted) {
+        if (chosen.length >= maxCards) break;
+        const cost = getCardCost(c.rarity);
+        if (spent + cost <= currentMana) {
+          chosen.push(c);
+          spent += cost;
+        }
+      }
     } else {
-      // Normal/Easy: escolha aleatória
-      const count  = Math.floor(Math.random() * maxBot) + 1;
-      chosen = shuffleArray(botHand).slice(0, count);
+      // Normal/Easy: escolha aleatória com limite de mana
+      const shuffled = shuffleArray(botHand);
+      chosen = [];
+      let spent = 0;
+      for (const c of shuffled) {
+        if (chosen.length >= maxCards) break;
+        const cost = getCardCost(c.rarity);
+        if (spent + cost <= currentMana) {
+          chosen.push(c);
+          spent += cost;
+        }
+      }
     }
 
+    // Fallback: se não cabe nada, passa o turno (0 cartas)
     set({ selectedBotCards: chosen });
-
-    // Resolve após pequeno delay para animação
     setTimeout(() => { get().resolveRound(); }, 700);
   },
 
-  // ── Resolve round ─────────────────────────────────────────────────────────
+  // ── Resolver round — dano excedente ──────────────────────────────────────
   resolveRound: () => {
     const {
       selectedPlayerCards, selectedBotCards,
-      playerScore, botScore,
+      playerHp, botHp,
       isResolving,
     } = get();
 
     if (isResolving) return;
-    if (selectedPlayerCards.length === 0 && selectedBotCards.length === 0) return;
-
     set({ isResolving: true });
 
-    // Soma total de dano
     const playerTotal = selectedPlayerCards.reduce((s, c) => s + c.damage, 0);
     const botTotal    = selectedBotCards.reduce((s, c) => s + c.damage, 0);
 
-    const roundWinner: 'player' | 'bot' | 'draw' =
-      playerTotal > botTotal ? 'player' :
-      botTotal > playerTotal ? 'bot'    : 'draw';
+    let roundWinner  : 'player' | 'bot' | 'draw';
+    let newPlayerHp   = playerHp;
+    let newBotHp      = botHp;
+    let damageDealt   = 0;
+    let damageTarget  : 'player' | 'bot' | null = null;
 
-    const newPlayerScore = roundWinner === 'player' ? playerScore + 1 : playerScore;
-    const newBotScore    = roundWinner === 'bot'    ? botScore    + 1 : botScore;
+    if (playerTotal > botTotal) {
+      roundWinner  = 'player';
+      damageDealt  = playerTotal - botTotal;
+      newBotHp     = Math.max(0, botHp - damageDealt);
+      damageTarget = 'bot';
+    } else if (botTotal > playerTotal) {
+      roundWinner  = 'bot';
+      damageDealt  = botTotal - playerTotal;
+      newPlayerHp  = Math.max(0, playerHp - damageDealt);
+      damageTarget = 'player';
+    } else {
+      roundWinner = 'draw';
+    }
 
-    // Verifica fim de jogo (primeiro a 5 pontos)
-    let gameWinner: 'player' | 'bot' | null = null;
-    let phase: BattlePhase = 'round-result';
+    // Verifica fim de jogo
+    let gameWinner : 'player' | 'bot' | null = null;
+    let phase      : BattlePhase = 'round-result';
 
-    if (newPlayerScore >= 5) { gameWinner = 'player'; phase = 'game-over'; }
-    else if (newBotScore >= 5) { gameWinner = 'bot';  phase = 'game-over'; }
+    if (newBotHp <= 0)    { gameWinner = 'player'; phase = 'game-over'; }
+    if (newPlayerHp <= 0) { gameWinner = 'bot';    phase = 'game-over'; }
 
     set({
       phase,
       roundWinner,
-      playerScore : newPlayerScore,
-      botScore    : newBotScore,
-      gameWinner,                 // ← FIX: era o bug da v1 (estava ausente)
+      playerHp     : newPlayerHp,
+      botHp        : newBotHp,
+      damageDealt,
+      damageTarget,
+      gameWinner,
       isTimerRunning: false,
       isResolving   : false,
     });
@@ -430,48 +484,50 @@ export const useBattleStore = create<BattleState & BattleActions>((set, get) => 
       playerDeck, botDeck,
       playerHand, botHand,
       selectedPlayerCards, selectedBotCards,
-      cardsPlayedThisRound, round,
+      cardsPlayedThisRound, round, currentMana,
     } = get();
 
     // Remove cartas jogadas das mãos
-    const playedIds = new Set(selectedPlayerCards.map((c) => c.id));
-    const botPlayedIds = new Set(selectedBotCards.map((c) => c.id));
-    const newPlayerHand = playerHand.filter((c) => !playedIds.has(c.id));
-    const newBotHand    = botHand.filter((c) => !botPlayedIds.has(c.id));
+    const playedIds    = new Set(selectedPlayerCards.map(c => c.id));
+    const botPlayedIds = new Set(selectedBotCards.map(c => c.id));
+    const newPlayerHand = playerHand.filter(c => !playedIds.has(c.id));
+    const newBotHand    = botHand.filter(c => !botPlayedIds.has(c.id));
 
-    // Sistema de compra: quanto menos cartas jogou, mais compra
-    // 0 jogadas → +4 | 1 → +3 | 2 → +2 | 3 → +1
+    // Compra: 1 carta base + espaços vazios no tabuleiro
+    // espaços_vazios = MAX_CARDS_PER_TURN - cartas_jogadas
+    // total = 1 + (3 - N) = 4 - N  (fusão conta como 1)
     const playerDrawCount = Math.max(1, 4 - cardsPlayedThisRound);
-    const botDrawCount    = 2; // bot sempre compra 2 por simplicidade
+    const botDrawCount    = Math.max(1, 4 - selectedBotCards.length);
 
     const playerDraw = drawCards(playerDeck, playerDrawCount);
     const botDraw    = drawCards(botDeck,    botDrawCount);
 
     set({
-      phase              : 'battle',
-      playerHand         : [...newPlayerHand, ...playerDraw.drawn],
-      botHand            : [...newBotHand,    ...botDraw.drawn],
-      playerDeck         : playerDraw.remaining,
-      botDeck            : botDraw.remaining,
+      phase               : 'battle',
+      playerHand          : [...newPlayerHand, ...playerDraw.drawn],
+      botHand             : [...newBotHand,    ...botDraw.drawn],
+      playerDeck          : playerDraw.remaining,
+      botDeck             : botDraw.remaining,
       selectedPlayerCards : [],
       selectedBotCards    : [],
-      roundWinner        : null,
-      round              : round + 1,
-      timeLeft           : TIMER_SECONDS,
-      isTimerRunning     : true,
-      isPlayerReady      : false,
-      isResolving        : false,
+      roundWinner         : null,
+      damageDealt         : 0,
+      damageTarget        : null,
+      round               : round + 1,
+      currentMana         : currentMana + 1,   // +1 mana por turno
+      timeLeft            : TIMER_SECONDS,
+      isTimerRunning      : true,
+      isPlayerReady       : false,
+      isResolving         : false,
       cardsPlayedThisRound: 0,
     });
   },
 
-  // ── Timer tick ────────────────────────────────────────────────────────────
+  // ── Timer ─────────────────────────────────────────────────────────────────
   tickTimer: () => {
     const { timeLeft, isTimerRunning, phase } = get();
     if (!isTimerRunning || phase !== 'battle') return;
-
     if (timeLeft <= 1) {
-      // Tempo esgotado → força "Pronto" automático
       set({ timeLeft: 0, isTimerRunning: false });
       get().pressReady();
     } else {

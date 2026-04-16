@@ -932,6 +932,279 @@
   transform: translateY(-2px);
 }
 
+
+.hs-battle-header {
+  gap: 8px;
+}
+
+/* Centro do HUD (Round + mana) */
+.hs-hud-center {
+  display       : flex;
+  flex-direction: column;
+  align-items   : center;
+  gap           : 6px;
+  min-width     : 120px;
+}
+
+.hs-hud-round {
+  display    : flex;
+  align-items: center;
+  gap        : 6px;
+}
+
+/* ─── Barra de HP ─────────────────────────────────────────── */
+
+.hs-hp-block {
+  display       : flex;
+  flex-direction: column;
+  align-items   : center;
+  gap           : 3px;
+  min-width     : 120px;
+  max-width     : 180px;
+  flex          : 1;
+}
+
+.hs-hp-label {
+  font-size     : 11px;
+  color         : var(--txt2, #8899aa);
+  letter-spacing: 0.5px;
+  white-space   : nowrap;
+}
+
+.hs-hp-bar-wrap {
+  width        : 100%;
+  height       : 8px;
+  background   : rgba(255,255,255,0.08);
+  border-radius: 99px;
+  overflow     : hidden;
+  border       : 1px solid rgba(255,255,255,0.06);
+}
+
+.hs-hp-bar {
+  height       : 100%;
+  border-radius: 99px;
+  transition   : width 0.6s ease, background 0.4s;
+  position     : relative;
+}
+
+/* Pulso vermelho quando dano é tomado */
+.hs-hp-bar--damaged {
+  animation: hs-damage-pulse 0.5s ease;
+}
+
+@keyframes hs-damage-pulse {
+  0%   { filter: brightness(1); }
+  25%  { filter: brightness(2.5) saturate(0.3); }
+  100% { filter: brightness(1); }
+}
+
+.hs-hp-val {
+  font-size  : 12px;
+  font-weight: 700;
+  transition : color 0.4s;
+}
+
+/* ─── Gemas de mana ───────────────────────────────────────── */
+
+.hs-mana-row {
+  display    : flex;
+  align-items: center;
+  gap        : 5px;
+}
+
+.hs-mana-label {
+  font-size: 13px;
+}
+
+.hs-mana-gems {
+  display: flex;
+  gap    : 3px;
+}
+
+.hs-mana-gem {
+  width        : 10px;
+  height       : 10px;
+  border-radius: 50%;
+  border       : 1px solid rgba(255,255,255,0.2);
+  transition   : background 0.2s, transform 0.15s;
+}
+
+.hs-mana-gem--full {
+  background: #3b82f6;
+  box-shadow : 0 0 6px rgba(59, 130, 246, 0.7);
+  transform  : scale(1.1);
+}
+
+.hs-mana-gem--spent {
+  background: rgba(59, 130, 246, 0.15);
+}
+
+.hs-mana-val {
+  font-size  : 12px;
+  font-weight: 700;
+  color      : #60a5fa;
+  white-space: nowrap;
+}
+
+/* Badge de mana gasta na ready bar */
+.hs-mana-spent-badge {
+  font-size    : 11px;
+  color        : #60a5fa;
+  padding      : 3px 8px;
+  background   : rgba(59, 130, 246, 0.12);
+  border       : 1px solid rgba(59, 130, 246, 0.3);
+  border-radius: 4px;
+  white-space  : nowrap;
+}
+
+/* ─── Carta sem mana ──────────────────────────────────────── */
+
+/* Dimm diferente do "max reached": avermelhado para indicar custo alto */
+.hs-hand-card--nomana {
+  filter    : brightness(0.45) saturate(0.3) sepia(0.4);
+  cursor    : not-allowed !important;
+  transform : rotate(var(--rotate, 0deg)) translateY(var(--drop, 0px)) !important;
+  pointer-events: none;
+}
+
+/* Overlay de "sem mana" na carta */
+.hs-card-nomana-overlay {
+  position       : absolute;
+  inset          : 0;
+  background     : rgba(220, 30, 30, 0.18);
+  display        : flex;
+  align-items    : center;
+  justify-content: center;
+  z-index        : 5;
+  border-radius  : calc(var(--card-radius, 14px) - 2px);
+  pointer-events : none;
+}
+
+.hs-card-nomana-overlay span {
+  font-size    : 13px;
+  font-weight  : 800;
+  color        : #f87171;
+  background   : rgba(0,0,0,0.7);
+  padding      : 3px 8px;
+  border-radius: 6px;
+  border       : 1px solid #f87171;
+}
+
+/* ─── Botão de Fusão ──────────────────────────────────────── */
+
+.hs-btn-fuse {
+  padding       : 8px 18px;
+  background    : linear-gradient(135deg, #7c3aed, #a855f7);
+  border        : 2px solid #c084fc;
+  border-radius : 8px;
+  color         : #fff;
+  font-size     : 13px;
+  font-weight   : 800;
+  cursor        : pointer;
+  letter-spacing: 0.3px;
+  transition    : all 0.2s;
+  white-space   : nowrap;
+  flex-shrink   : 0;
+  box-shadow    : 0 0 16px rgba(192, 132, 252, 0.5);
+  animation     : hs-fuse-pulse 1.5s ease-in-out infinite;
+}
+
+.hs-btn-fuse:hover {
+  transform : translateY(-2px) scale(1.04);
+  box-shadow: 0 0 28px rgba(192, 132, 252, 0.75);
+}
+
+@keyframes hs-fuse-pulse {
+  0%, 100% { box-shadow: 0 0 12px rgba(192,132,252,0.4); }
+  50%       { box-shadow: 0 0 24px rgba(192,132,252,0.8); }
+}
+
+/* ─── Round Result: HP bars ───────────────────────────────── */
+
+.hs-round-result-hp {
+  display    : flex;
+  align-items: center;
+  gap        : 8px;
+  width      : 100%;
+  max-width  : 500px;
+  padding    : 12px 16px;
+  background : rgba(0,0,0,0.3);
+  border     : 1px solid rgba(255,255,255,0.06);
+  border-radius: 12px;
+}
+
+.hs-round-result-hp .hs-hp-block {
+  max-width: none;
+}
+
+/* ─── Game Over: HP display ───────────────────────────────── */
+
+.hs-gameover-hp {
+  display    : flex;
+  align-items: center;
+  gap        : 24px;
+  padding    : 16px 32px;
+  background : var(--bg2, #1a2332);
+  border     : 1px solid var(--b2, #223344);
+  border-radius: 14px;
+}
+
+.hs-gameover-hp-side {
+  display       : flex;
+  flex-direction: column;
+  align-items   : center;
+  gap           : 4px;
+  min-width     : 90px;
+}
+
+.hs-gameover-hp-label {
+  font-size: 12px;
+  color    : var(--txt3, #556677);
+}
+
+.hs-gameover-hp-val {
+  font-size  : 28px;
+  font-weight: 900;
+}
+
+.hs-gameover-hp-div {
+  font-size: 24px;
+  color    : rgba(255,255,255,0.2);
+}
+
+/* ─── Damage float animation (para round-result) ─────────── */
+
+.hs-damage-float {
+  font-size  : 28px;
+  font-weight: 900;
+  color      : #f87171;
+  text-align : center;
+  animation  : hs-float-up 0.8s ease-out both;
+  pointer-events: none;
+}
+
+.hs-damage-float--player { color: #f87171; }
+.hs-damage-float--bot    { color: '#4ade80'; }
+
+@keyframes hs-float-up {
+  0%   { opacity: 1; transform: translateY(0) scale(1); }
+  100% { opacity: 0; transform: translateY(-32px) scale(1.3); }
+}
+
+/* ─── Responsive ──────────────────────────────────────────── */
+
+@media (max-width: 640px) {
+  .hs-hp-block     { min-width: 80px; }
+  .hs-mana-gems    { gap: 2px; }
+  .hs-mana-gem     { width: 8px; height: 8px; }
+  .hs-btn-fuse     { padding: 6px 12px; font-size: 12px; }
+  .hs-hud-center   { min-width: 80px; }
+  .hs-gameover-hp  { gap: 16px; padding: 12px 20px; }
+  .hs-gameover-hp-val { font-size: 22px; }
+}
+
+
+
 /* ─── Responsive ──────────────────────────────────────────── */
 
 @media (max-width: 640px) {

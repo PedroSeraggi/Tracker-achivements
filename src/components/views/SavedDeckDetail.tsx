@@ -6,7 +6,6 @@
 import React, { useMemo, useState } from 'react';
 import { useAppStore } from '../../store/useAppStore';
 import TrophyCard from './TrophyCard';
-import { RARITY_TIERS } from '../../utils/duelUtils';
 
 const DUEL_SORTS: { value: 'damage-desc' | 'damage-asc' | 'rarity-desc' | 'rarity-asc' | 'name'; label: string }[] = [
   { value: 'damage-desc', label: '🔥 Dano (maior)' },
