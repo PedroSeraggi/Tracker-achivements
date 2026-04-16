@@ -339,7 +339,7 @@ const ArenaColumn: React.FC<{
 const DuelBattle: React.FC = () => {
   const {
     phase, playerHand, botHand,
-    playerHp, botHp, currentMana,
+    playerHp, botHp, currentMana, maxMana,
     round,
     selectedPlayerCards, selectedBotCards,
     roundWinner, gameWinner,
@@ -584,7 +584,7 @@ const DuelBattle: React.FC = () => {
             <span className="hs-hud-label">Round</span>
             <span className="hs-hud-val">{round}</span>
           </div>
-          <ManaGems total={currentMana} spent={spentMana} />
+          <ManaGems total={maxMana} spent={maxMana - availableMana} />
         </div>
 
         {/* HP do bot */}
@@ -661,7 +661,7 @@ const DuelBattle: React.FC = () => {
             Selecione cartas da sua mão e clique em <strong>Pronto</strong>
             <br />
             <span style={{ fontSize: 12, opacity: 0.7 }}>
-              Você tem <strong style={{ color: '#60a5fa' }}>{currentMana}</strong> de mana
+              Você tem <strong style={{ color: '#60a5fa' }}>{availableMana}</strong>/{maxMana} de mana
             </span>
           </div>
         )}
@@ -682,7 +682,7 @@ const DuelBattle: React.FC = () => {
                   → próx. turno: +{nextDraw} carta{nextDraw !== 1 ? 's' : ''}
                 </span>
                 <span className="hs-mana-spent-badge">
-                  💧 {spentMana}/{currentMana}
+                  💧 {maxMana - availableMana}/{maxMana}
                 </span>
               </>
             )}

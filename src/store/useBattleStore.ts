@@ -79,6 +79,8 @@ interface BattleState {
   botHp               : number;
   /** Mana atual (começa em 3, +1 por turno) */
   currentMana         : number;
+  /** Mana máxima (aumenta +1 por turno, usada para calcular mana do próximo round) */
+  maxMana             : number;
   round               : number;
   selectedPlayerCards  : TrophyCard[];
   selectedBotCards     : TrophyCard[];
@@ -119,6 +121,7 @@ const INITIAL_STATE: BattleState = {
   playerHp            : INITIAL_HP,
   botHp               : INITIAL_HP,
   currentMana         : INITIAL_MANA,
+  maxMana             : INITIAL_MANA,
   round               : 1,
   selectedPlayerCards  : [],
   selectedBotCards     : [],
@@ -487,7 +490,7 @@ export const useBattleStore = create<BattleState & BattleActions>((set, get) => 
       playerDeck, botDeck,
       playerHand, botHand,
       selectedPlayerCards, selectedBotCards,
-      cardsPlayedThisRound, round, currentMana,
+      cardsPlayedThisRound, round, maxMana,
     } = get();
 
     // Remove cartas jogadas das mãos
@@ -521,7 +524,8 @@ export const useBattleStore = create<BattleState & BattleActions>((set, get) => 
       damageDealt         : 0,
       damageTarget        : null,
       round               : round + 1,
-      currentMana         : currentMana + 1,   // +1 mana por turno
+      currentMana         : maxMana + 1,   // +1 mana máxima por turno
+      maxMana             : maxMana + 1,   // aumenta o máximo também
       timeLeft            : TIMER_SECONDS,
       isTimerRunning      : true,
       isPlayerReady       : false,
