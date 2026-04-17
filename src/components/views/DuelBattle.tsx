@@ -1,35 +1,28 @@
 // ─────────────────────────────────────────────────────────────────────────────
-//  src/components/duel/DuelBattle.tsx  (v3)
+//  src/components/duel/DuelBattle.tsx  (v4 — Board Edition)
 //
-//  Preserva TODAS as mudanças de UI do v2 (hs-card-mini, sons, etc.)
-//  e adiciona:
-//    - Barras de HP no HUD (substituem placar de pontos)
-//    - Gemas de mana no HUD
-//    - Bloqueio de seleção por mana insuficiente (dimm diferente)
-//    - Botão "✨ Fundir" quando 2 cartas de mesma raridade selecionadas
-//    - Tela de round-result mostra o dano causado e HP restante
-//    - Tela de game-over mostra HP final
+//  Full redesign:
+//    - Real game board with distinct zones (bot field / center divide / player field)
+//    - 3 card slots per side, visually rendered at all times
+//    - Drag-and-drop: click+hold card → drag to player field → drop to play
+//    - Ghost card follows cursor while dragging
+//    - Mana crystals with spend animation
+//    - Ambient board particles (CSS)
+//    - All existing game logic (HP, mana cost, fusion, ready button) preserved
 // ─────────────────────────────────────────────────────────────────────────────
 
 import React, { useEffect, useCallback, useMemo, useState } from 'react';
 import { useBattleStore, getCardCost } from '../../store/useBattleStore';
 import { useFanLayout } from '../../hooks/useFanLayout';
+import { useDragCard } from '../../hooks/useDragCard';
 import type { TrophyCard } from '../../types/duel';
 import {
-  playHoverSound,
-  playCardSelectSound,
-  playCardPlaySound,
-  playReadySound,
-  playWinRoundSound,
-  playLoseRoundSound,
-  playGameWinSound,
-  playGameLoseSound,
-  playTickSound,
-  playFuseSound,
-  initAudio,
+  playHoverSound, playCardSelectSound, playCardPlaySound,
+  playReadySound, playWinRoundSound, playLoseRoundSound,
+  playGameWinSound, playGameLoseSound, playTickSound, initAudio,
 } from '../../utils/soundEffects';
 
-// ─── Cores ────────────────────────────────────────────────────────────────────
+// ─── Constants ────────────────────────────────────────────────────────────────
 
 const RARITY_COLOR: Record<string, string> = {
   common   : '#9ca3af',
@@ -40,74 +33,281 @@ const RARITY_COLOR: Record<string, string> = {
   mythic   : '#f472b6',
 };
 
+const MAX_SLOTS = 3;
 const INITIAL_HP = 3500;
 
-// ─── Sub: barra de HP ─────────────────────────────────────────────────────────
+// ─── Sub: Mana Crystals ───────────────────────────────────────────────────────
 
-const HpBar: React.FC<{ hp: number; maxHp?: number; label: string; damaged?: boolean }> = ({
-  hp, maxHp = INITIAL_HP, label, damaged,
+const ManaCrystals: React.FC<{ total: number; spent: number; size?: 'sm' | 'md' }> = ({
+  total, spent, size = 'md',
 }) => {
-  const pct = Math.max(0, Math.min(100, (hp / maxHp) * 100));
-  const barColor =
-    pct > 50 ? '#4ade80' :
-    pct > 25 ? '#fbbf24' : '#f87171';
+  const available = Math.max(0, total - spent);
+  const display   = Math.min(total, 10);
 
   return (
-    <div className="hs-hp-block">
-      <div className="hs-hp-label">{label}</div>
-      <div className="hs-hp-bar-wrap">
+    <div className={`bd-mana-crystals bd-mana-crystals--${size}`}>
+      {Array.from({ length: display }).map((_, i) => (
         <div
-          className={`hs-hp-bar${damaged ? ' hs-hp-bar--damaged' : ''}`}
-          style={{ width: `${pct}%`, background: barColor }}
+          key={i}
+          className={`bd-mana-gem ${i < available ? 'bd-mana-gem--full' : 'bd-mana-gem--spent'}`}
+          style={{ animationDelay: `${i * 0.06}s` }}
         />
-      </div>
-      <div className="hs-hp-val" style={{ color: barColor }}>{hp.toLocaleString()}</div>
+      ))}
+      {total > 10 && (
+        <span className="bd-mana-overflow">+{total - 10}</span>
+      )}
+      <span className="bd-mana-val">{available}/{total}</span>
     </div>
   );
 };
 
-// ─── Sub: gemas de mana ───────────────────────────────────────────────────────
+// ─── Sub: HP Bar ─────────────────────────────────────────────────────────────
 
-const ManaGems: React.FC<{ total: number; spent: number }> = ({ total, spent }) => {
-  const available = total - spent;
-  // Exibe no máximo 10 gemas; para valores maiores mostra o número
-  const displayCount = Math.min(total, 10);
+const HpBar: React.FC<{
+  hp: number; maxHp?: number; label: string;
+  side: 'player' | 'bot'; showDamage?: number;
+}> = ({ hp, maxHp = INITIAL_HP, label, side, showDamage }) => {
+  const pct   = Math.max(0, Math.min(100, (hp / maxHp) * 100));
+  const color = pct > 60 ? '#4ade80' : pct > 30 ? '#fbbf24' : '#f87171';
 
   return (
-    <div className="hs-mana-row">
-      <span className="hs-mana-label">💧</span>
-      <div className="hs-mana-gems">
-        {Array.from({ length: displayCount }).map((_, i) => (
-          <div
-            key={i}
-            className={`hs-mana-gem ${i < available ? 'hs-mana-gem--full' : 'hs-mana-gem--spent'}`}
-          />
-        ))}
+    <div className={`bd-hp-block bd-hp-block--${side}`}>
+      <div className="bd-hp-avatar">
+        {side === 'player' ? '⚔️' : '🤖'}
       </div>
-      <span className="hs-mana-val">
-        {available}/{total}
-      </span>
+      <div className="bd-hp-info">
+        <div className="bd-hp-label">{label}</div>
+        <div className="bd-hp-track">
+          <div
+            className="bd-hp-fill"
+            style={{ width: `${pct}%`, background: color }}
+          />
+        </div>
+        <div className="bd-hp-val" style={{ color }}>
+          {hp.toLocaleString()}
+          {showDamage != null && showDamage > 0 && (
+            <span className="bd-hp-damage-float">-{showDamage.toLocaleString()}</span>
+          )}
+        </div>
+      </div>
     </div>
   );
 };
 
-// ─── Sub: carta na mão ────────────────────────────────────────────────────────
+// ─── Sub: Card Slot (empty slot on the board) ─────────────────────────────────
+
+const BoardSlot: React.FC<{
+  card     : TrophyCard | null;
+  side     : 'player' | 'bot';
+  isTarget?: boolean;
+  isWinner?: boolean;
+}> = ({ card, side, isTarget, isWinner }) => {
+  const rarityColor = card ? (RARITY_COLOR[card.rarity] ?? '#9ca3af') : 'transparent';
+  const cost = card ? getCardCost(card.rarity) : null;
+  const pct  = card?.globalPercent != null ? `${card.globalPercent.toFixed(1)}%` : null;
+
+  if (!card) {
+    return (
+      <div
+        className={[
+          'bd-board-slot bd-board-slot--empty',
+          isTarget ? 'bd-board-slot--target' : '',
+          side === 'player' ? 'bd-board-slot--player' : 'bd-board-slot--bot',
+        ].filter(Boolean).join(' ')}
+      >
+        {isTarget && <div className="bd-slot-target-ring" />}
+        <div className="bd-slot-hint">
+          {side === 'player' ? '↓ Solte aqui' : ''}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className={[
+        'bd-board-slot bd-board-slot--filled',
+        isWinner ? 'bd-board-slot--winner' : '',
+      ].filter(Boolean).join(' ')}
+      data-rarity={card.rarity}
+      style={{ '--rarity-color': rarityColor } as React.CSSProperties}
+    >
+      {/* Cost bubble */}
+      {cost != null && (
+        <div className="bd-slot-cost" style={{ background: rarityColor }}>
+          {cost}
+        </div>
+      )}
+
+      {/* Art */}
+      <div className="bd-slot-art">
+        <div
+          className="bd-slot-art-bg"
+          style={{ backgroundImage: `url('${card.iconUrl || card.gameHeaderUrl}')` }}
+        />
+        {card.iconUrl ? (
+          <img
+            className="bd-slot-art-icon"
+            src={card.iconUrl}
+            alt={card.name}
+            loading="lazy"
+            onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+          />
+        ) : (
+          <div className="bd-slot-art-emoji">{card.rarityEmoji}</div>
+        )}
+        <div className="bd-slot-rarity-badge" style={{ color: rarityColor }}>
+          {card.rarityLabel}
+        </div>
+      </div>
+
+      {/* Info */}
+      <div className="bd-slot-info">
+        <div className="bd-slot-name">{card.name}</div>
+        <div className="bd-slot-game">{card.gameName}</div>
+      </div>
+
+      {/* Damage */}
+      <div className="bd-slot-damage" style={{ color: rarityColor }}>
+        ⚔ {card.damage}
+        {pct && <span className="bd-slot-pct"> · {pct}</span>}
+      </div>
+
+      {/* Winner glow */}
+      {isWinner && <div className="bd-slot-winner-glow" />}
+    </div>
+  );
+};
+
+// ─── Sub: Board Center Divider ────────────────────────────────────────────────
+
+const BoardCenter: React.FC<{
+  playerTotal: number;
+  botTotal   : number;
+  isReady    : boolean;
+  botReady   : boolean;
+}> = ({ playerTotal, botTotal, isReady, botReady }) => {
+  const diff = playerTotal - botTotal;
+
+  return (
+    <div className="bd-center">
+      <div className="bd-center-line">
+        <div className="bd-center-gem" />
+      </div>
+
+      {(playerTotal > 0 || botTotal > 0) && (
+        <div className="bd-center-totals">
+          <div
+            className="bd-center-total bd-center-total--player"
+            style={{ color: diff > 0 ? '#4ade80' : diff < 0 ? '#f87171' : '#fff' }}
+          >
+            {playerTotal}
+          </div>
+          <div className="bd-center-vs">⚔</div>
+          <div
+            className="bd-center-total bd-center-total--bot"
+            style={{ color: diff < 0 ? '#4ade80' : diff > 0 ? '#f87171' : '#fff' }}
+          >
+            {botTotal}
+          </div>
+        </div>
+      )}
+
+      {/* Ready indicators */}
+      <div className="bd-center-status">
+        {isReady  && <div className="bd-ready-indicator bd-ready-indicator--player">✓ Pronto</div>}
+        {botReady && <div className="bd-ready-indicator bd-ready-indicator--bot">🤖 Pronto</div>}
+      </div>
+    </div>
+  );
+};
+
+// ─── Sub: Ghost Card (follows cursor during drag) ─────────────────────────────
+
+const GhostCard: React.FC<{
+  card      : TrophyCard;
+  x         : number;
+  y         : number;
+  isOverZone: boolean;
+  isSnapBack: boolean;
+  originX   : number;
+  originY   : number;
+}> = ({ card, x, y, isOverZone, isSnapBack, originX, originY }) => {
+  const rarityColor = RARITY_COLOR[card.rarity] ?? '#9ca3af';
+  const cost = getCardCost(card.rarity);
+
+  const style: React.CSSProperties = {
+    '--rarity-color': rarityColor,
+    position        : 'fixed',
+    left            : isSnapBack ? originX : x,
+    top             : isSnapBack ? originY : y,
+    transform       : isSnapBack
+      ? 'translate(-50%, -50%) scale(0.85)'
+      : isOverZone
+        ? 'translate(-50%, -50%) scale(1.08) rotate(-2deg)'
+        : 'translate(-50%, -50%) scale(1.0) rotate(-4deg)',
+    transition      : isSnapBack
+      ? 'left 0.28s ease, top 0.28s ease, transform 0.28s ease, opacity 0.28s ease'
+      : 'transform 0.15s ease',
+    zIndex          : 9999,
+    pointerEvents   : 'none',
+    width           : 'var(--card-width, 140px)',
+    height          : 'var(--card-height, 210px)',
+    opacity         : isSnapBack ? 0.5 : 1,
+  } as React.CSSProperties;
+
+  return (
+    <div className="bd-ghost-card" style={style} data-rarity={card.rarity}>
+      <div className="bd-ghost-inner">
+        {/* Intense glow when over drop zone */}
+        {isOverZone && (
+          <div
+            className="bd-ghost-dropzone-glow"
+            style={{ boxShadow: `0 0 40px 12px ${rarityColor}` }}
+          />
+        )}
+
+        <div className="bd-slot-cost" style={{ background: rarityColor }}>{cost}</div>
+
+        <div className="bd-slot-art">
+          <div className="bd-slot-art-bg"
+               style={{ backgroundImage: `url('${card.iconUrl || card.gameHeaderUrl}')` }} />
+          {card.iconUrl ? (
+            <img className="bd-slot-art-icon" src={card.iconUrl} alt={card.name} loading="lazy"
+                 onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+          ) : (
+            <div className="bd-slot-art-emoji">{card.rarityEmoji}</div>
+          )}
+          <div className="bd-slot-rarity-badge" style={{ color: rarityColor }}>{card.rarityLabel}</div>
+        </div>
+
+        <div className="bd-slot-info">
+          <div className="bd-slot-name">{card.name}</div>
+          <div className="bd-slot-game">{card.gameName}</div>
+        </div>
+        <div className="bd-slot-damage" style={{ color: rarityColor }}>⚔ {card.damage}</div>
+      </div>
+    </div>
+  );
+};
+
+// ─── Sub: Hand Card (for fan hand) ───────────────────────────────────────────
 
 interface HandCardProps {
-  card        : TrophyCard;
-  index       : number;
-  total       : number;
-  fanStyle    : Record<string, string | number>;
-  selOrder    : number;
-  canSelect   : boolean;
-  canDeselect : boolean;
-  noMana      : boolean;   // ← TRUE quando não tem mana (dimm vermelho)
-  onToggle    : () => void;
-  isFusingCard?: boolean;  // ← TRUE quando está sendo fundida
+  card       : TrophyCard;
+  fanStyle   : Record<string, string | number>;
+  selOrder   : number;
+  canSelect  : boolean;
+  canDeselect: boolean;
+  noMana     : boolean;
+  isDragging : boolean;
+  onStartDrag: (e: React.MouseEvent<HTMLElement>) => void;
+  onToggle   : () => void;
 }
 
 const HandCard: React.FC<HandCardProps> = ({
-  card, fanStyle, selOrder, canSelect, canDeselect, noMana, onToggle, isFusingCard,
+  card, fanStyle, selOrder, canSelect, canDeselect,
+  noMana, isDragging, onStartDrag, onToggle,
 }) => {
   const isSelected  = selOrder > 0;
   const cost        = getCardCost(card.rarity);
@@ -115,12 +315,11 @@ const HandCard: React.FC<HandCardProps> = ({
   const pctDisplay  = card.globalPercent != null ? `${card.globalPercent.toFixed(1)}%` : '??%';
   const clickable   = (canSelect && !isSelected) || (canDeselect && isSelected);
 
-  // Determina classe visual
   let extraClass = '';
-  if (isSelected) extraClass = ' hs-hand-card--selected';
+  if (isSelected)  extraClass = ' hs-hand-card--selected';
   else if (noMana) extraClass = ' hs-hand-card--nomana';
   else if (!canSelect) extraClass = ' hs-hand-card--disabled';
-  if (isFusingCard) extraClass += ' hs-hand-card--fusing';
+  if (isDragging)  extraClass += ' hs-hand-card--dragging';
 
   return (
     <div
@@ -130,47 +329,42 @@ const HandCard: React.FC<HandCardProps> = ({
         ...fanStyle,
         '--rarity-color': rarityColor,
         marginLeft      : `calc(-1 * var(--card-width, 140px) / 2)`,
-        pointerEvents   : clickable ? 'auto' : 'none',
+        pointerEvents   : isDragging ? 'none' : 'auto',
+        // Hint cursor when draggable
+        cursor          : canSelect && !noMana && !isDragging ? 'grab' : 'default',
       } as React.CSSProperties}
-      onClick={() => clickable && onToggle()}
+      onMouseDown={e => {
+        if (canSelect && !noMana) {
+          onStartDrag(e);
+        }
+      }}
+      onClick={() => {
+        if (clickable) onToggle();
+      }}
       onMouseEnter={() => clickable && playHoverSound()}
-      title={noMana ? `⚡ Sem mana (custo: ${cost})` : (card.description || card.name)}
+      title={noMana ? `Sem mana (custo: ${cost})` : (card.description || card.name)}
     >
       <div className="hs-card-inner" data-rarity={card.rarity}>
+        <div className="hs-card-cost" style={{ background: rarityColor }}>{cost}</div>
 
-        {/* Badge de custo */}
-        <div className="hs-card-cost" style={{ background: rarityColor }}>
-          {cost}
-        </div>
-
-        {/* Ordem de seleção */}
         {isSelected && (
           <div className="hs-card-sel-order">
             {selOrder === 1 ? '①' : selOrder === 2 ? '②' : '③'}
           </div>
         )}
 
-        {/* Indicador de mana insuficiente */}
         {noMana && (
           <div className="hs-card-nomana-overlay">
-            <span>⚡{cost}</span>
+            <span>💧{cost}</span>
           </div>
         )}
 
-        {/* Arte */}
         <div className="hs-card-art">
-          <div
-            className="hs-card-art-bg"
-            style={{ backgroundImage: `url('${card.iconUrl || card.gameHeaderUrl}')` }}
-          />
+          <div className="hs-card-art-bg"
+               style={{ backgroundImage: `url('${card.iconUrl || card.gameHeaderUrl}')` }} />
           {card.iconUrl ? (
-            <img
-              className="hs-card-art-icon"
-              src={card.iconUrl}
-              alt={card.name}
-              loading="lazy"
-              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-            />
+            <img className="hs-card-art-icon" src={card.iconUrl} alt={card.name} loading="lazy"
+                 onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
           ) : (
             <div className="hs-card-art-emoji" style={{ borderColor: rarityColor }}>
               {card.rarityEmoji}
@@ -180,39 +374,31 @@ const HandCard: React.FC<HandCardProps> = ({
             {card.rarityLabel}
           </div>
           <div className="hs-card-game-thumb">
-            <img
-              src={card.gameHeaderUrl} alt={card.gameName} loading="lazy"
-              onError={(e) => { const p = (e.target as HTMLImageElement).parentElement; if (p) p.style.display = 'none'; }}
-            />
+            <img src={card.gameHeaderUrl} alt={card.gameName} loading="lazy"
+                 onError={e => { const p = (e.target as HTMLImageElement).parentElement; if (p) p.style.display = 'none'; }} />
           </div>
         </div>
 
-        {/* Corpo */}
         <div className="hs-card-body">
           <div className="hs-card-name">{card.name}</div>
           <div className="hs-card-game">{card.gameName}</div>
-          {card.description && (
-            <div className="hs-card-desc">{card.description}</div>
-          )}
+          {card.description && <div className="hs-card-desc">{card.description}</div>}
         </div>
 
-        {/* Rodapé */}
         <div className="hs-card-footer">
           <span className="hs-card-pct">{pctDisplay}</span>
           <div className="hs-card-damage" style={{ color: rarityColor }}>
-            <span>⚔</span>
-            <strong>{card.damage}</strong>
+            <span>⚔</span><strong>{card.damage}</strong>
           </div>
         </div>
 
-        {/* Overlay de seleção */}
         {isSelected && <div className="hs-card-selected-overlay" />}
       </div>
     </div>
   );
 };
 
-// ─── Sub: carta do bot ────────────────────────────────────────────────────────
+// ─── Sub: Bot Face-Down Card ──────────────────────────────────────────────────
 
 const BotFaceDown: React.FC<{ fanStyle: Record<string, string | number> }> = ({ fanStyle }) => (
   <div
@@ -225,68 +411,44 @@ const BotFaceDown: React.FC<{ fanStyle: Record<string, string | number> }> = ({ 
   </div>
 );
 
-// ─── Sub: carta na arena (formato completo) ───────────────────────────────────
-// Mantido EXATAMENTE como o usuário personalizou (hs-card-mini)
+// ─── Sub: Arena Mini Card (result screens) ────────────────────────────────────
 
 const ArenaCard: React.FC<{
-  card       : TrophyCard;
-  isWinner?  : boolean;
-  delay?     : number;
-  isAttacking?: boolean;  // Animação de ataque (vencedor)
-  isDestroyed?: boolean;  // Animação de destruição (perdedor)
-}> = ({ card, isWinner, delay = 0, isAttacking, isDestroyed }) => {
+  card    : TrophyCard;
+  isWinner?: boolean;
+  delay   ?: number;
+}> = ({ card, isWinner, delay = 0 }) => {
   const rarityColor = RARITY_COLOR[card.rarity] ?? '#9ca3af';
-  const cost        = getCardCost(card.rarity);
-  const pctDisplay  = card.globalPercent != null ? `${card.globalPercent.toFixed(1)}%` : '??%';
-
-  let extraClass = '';
-  if (isWinner) extraClass += ' hs-arena-card--winner';
-  if (isAttacking) extraClass += ' hs-arena-card--attacking';
-  if (isDestroyed) extraClass += ' hs-arena-card--destroyed';
-
+  const cost = getCardCost(card.rarity);
+  const pctDisplay = card.globalPercent != null ? `${card.globalPercent.toFixed(1)}%` : '??%';
   return (
     <div
-      className={`hs-arena-card${extraClass}`}
+      className={`hs-arena-card${isWinner ? ' hs-arena-card--winner' : ''}`}
       data-rarity={card.rarity}
       style={{ '--rarity-color': rarityColor, animationDelay: `${delay}s` } as React.CSSProperties}
       title={card.description || card.name}
     >
-      {isAttacking && <div className="hs-arena-impact" />}
       <div className="hs-card-mini" data-rarity={card.rarity}>
-        <div className="hs-card-mini-cost" style={{ background: rarityColor }}>
-          {cost}
-        </div>
+        <div className="hs-card-mini-cost" style={{ background: rarityColor }}>{cost}</div>
         <div className="hs-card-mini-art">
           <div className="hs-card-mini-art-bg" style={{ backgroundImage: `url('${card.iconUrl || card.gameHeaderUrl}')` }} />
           {card.iconUrl ? (
             <img className="hs-card-mini-art-icon" src={card.iconUrl} alt={card.name} loading="lazy"
-                 onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                 onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
           ) : (
-            <div className="hs-card-mini-art-emoji" style={{ borderColor: rarityColor }}>
-              {card.rarityEmoji}
-            </div>
+            <div className="hs-card-mini-art-emoji" style={{ borderColor: rarityColor }}>{card.rarityEmoji}</div>
           )}
           <div className="hs-card-mini-rarity" style={{ color: rarityColor, borderColor: rarityColor }}>
             {card.rarityLabel}
-          </div>
-          <div className="hs-card-mini-thumb">
-            <img src={card.gameHeaderUrl} alt={card.gameName} loading="lazy"
-                 onError={(e) => { const p = (e.target as HTMLImageElement).parentElement; if (p) p.style.display = 'none'; }} />
           </div>
         </div>
         <div className="hs-card-mini-body">
           <div className="hs-card-mini-name">{card.name}</div>
           <div className="hs-card-mini-game">{card.gameName}</div>
-          {card.description && (
-            <div className="hs-card-mini-desc">{card.description}</div>
-          )}
         </div>
         <div className="hs-card-mini-footer">
           <span className="hs-card-mini-pct">{pctDisplay}</span>
-          <div className="hs-card-mini-damage" style={{ color: rarityColor }}>
-            <span>⚔</span>
-            <strong>{card.damage}</strong>
-          </div>
+          <div className="hs-card-mini-damage" style={{ color: rarityColor }}>⚔ <strong>{card.damage}</strong></div>
         </div>
       </div>
       {isWinner && <div className="hs-arena-winner-glow" />}
@@ -294,47 +456,27 @@ const ArenaCard: React.FC<{
   );
 };
 
-// ─── Sub: coluna de arena ─────────────────────────────────────────────────────
-
 const ArenaColumn: React.FC<{
-  cards       : TrophyCard[];
-  total       : number;
-  isWinner?   : boolean;
-  label       : string;
-  waiting?    : boolean;
-  isAttacking?: boolean;  // Animação de ataque (vencedor)
-  isDestroyed?: boolean;  // Animação de destruição (perdedor)
-}> = ({ cards, total, isWinner, label, waiting, isAttacking, isDestroyed }) => (
+  cards: TrophyCard[]; total: number; isWinner?: boolean; label: string;
+}> = ({ cards, total, isWinner, label }) => (
   <div className="hs-arena-column">
     <div className="hs-arena-column-label">{label}</div>
     {cards.length === 0 ? (
-      <div className="hs-arena-slot-empty">
-        {waiting ? <span className="hs-bot-thinking">⏳ escolhendo…</span> : 'aguardando'}
-      </div>
+      <div className="hs-arena-slot-empty">—</div>
     ) : (
       <>
         <div className="hs-arena-cards-row">
-          {cards.map((c, i) => (
-            <ArenaCard 
-              key={c.id} 
-              card={c} 
-              isWinner={isWinner} 
-              delay={i * 0.08}
-              isAttacking={isAttacking}
-              isDestroyed={isDestroyed}
-            />
-          ))}
+          {cards.map((c, i) => <ArenaCard key={c.id} card={c} isWinner={isWinner} delay={i * 0.08} />)}
         </div>
         <div className="hs-arena-total" style={{ color: isWinner ? '#4ade80' : 'var(--txt2)' }}>
-          Total: <strong>{total}</strong>
-          {isWinner && ' ⚔'}
+          Total: <strong>{total}</strong>{isWinner && ' ⚔'}
         </div>
       </>
     )}
   </div>
 );
 
-// ─── Componente principal ─────────────────────────────────────────────────────
+// ─── Main Component ───────────────────────────────────────────────────────────
 
 const DuelBattle: React.FC = () => {
   const {
@@ -349,21 +491,39 @@ const DuelBattle: React.FC = () => {
     botPlay, resolveRound, nextRound, resetBattle, tickTimer,
   } = useBattleStore();
 
-  // ── Animação de fusão ────────────────────────────────────────────────────
-  const [isFusing, setIsFusing] = useState(false);
-  const [fusingIds, setFusingIds] = useState<string[]>([]);
+  const [showDamage, setShowDamage] = useState(false);
 
-  // ── Animação de ataque/destruição no round result ────────────────────────
-  const [isAttacking, setIsAttacking] = useState(false);
-
-  // ── Audio init ───────────────────────────────────────────────────────────
+  // Audio
   useEffect(() => { initAudio(); }, []);
 
-  // ── Fan layouts ──────────────────────────────────────────────────────────
+  // Fan layouts
   const playerFan = useFanLayout(playerHand.length, 140, 18);
   const botFan    = useFanLayout(botHand.length,    56,  8);
 
-  // ── Timer ────────────────────────────────────────────────────────────────
+  // Mana calculations
+  const spentMana = useMemo(
+    () => selectedPlayerCards.reduce((s, c) => s + getCardCost(c.rarity), 0),
+    [selectedPlayerCards],
+  );
+
+  // canDrop guard for drag system
+  const canDrop = useCallback((card: TrophyCard) => {
+    if (phase !== 'battle' || isPlayerReady) return false;
+    if (selectedPlayerCards.length >= 3) return false;
+    const alreadySel = selectedPlayerCards.some(c => c.id === card.id);
+    if (alreadySel) return false;
+    const cost = getCardCost(card.rarity);
+    return spentMana + cost <= currentMana;
+  }, [phase, isPlayerReady, selectedPlayerCards, spentMana, currentMana]);
+
+  const handleDrop = useCallback((card: TrophyCard) => {
+    playCardPlaySound();
+    toggleCard(card);
+  }, [toggleCard]);
+
+  const { drag, startDrag, dropZoneRef } = useDragCard(handleDrop, canDrop);
+
+  // Timer
   useEffect(() => {
     if (!isTimerRunning) return;
     const id = setInterval(() => {
@@ -373,43 +533,36 @@ const DuelBattle: React.FC = () => {
     return () => clearInterval(id);
   }, [isTimerRunning, tickTimer, timeLeft]);
 
-  // ── Bot joga após player confirmar ───────────────────────────────────────
+  // Bot plays
   useEffect(() => {
     if (phase === 'battle' && isPlayerReady && selectedBotCards.length === 0) {
       playReadySound();
-      const t = setTimeout(() => { botPlay(); }, 500);
+      const t = setTimeout(() => botPlay(), 500);
       return () => clearTimeout(t);
     }
   }, [phase, isPlayerReady, selectedBotCards.length, botPlay]);
 
-  // ── Resolve quando ambos confirmaram ────────────────────────────────────
+  // Resolve
   useEffect(() => {
-    if (phase === 'battle' && isPlayerReady && selectedBotCards.length >= 0) {
-      // Resolve mesmo se bot jogou 0 cartas (passou turno)
-      if (!isPlayerReady) return;
-      // Aguarda um frame para garantir que selectedBotCards foi atualizado
-      const t = setTimeout(() => { resolveRound(); }, 900);
+    if (phase === 'battle' && isPlayerReady && selectedBotCards.length >= 0 && isPlayerReady) {
+      const t = setTimeout(() => resolveRound(), 900);
       return () => clearTimeout(t);
     }
   }, [phase, isPlayerReady, selectedBotCards, resolveRound]); // eslint-disable-line
 
-  // ── Sons e animação de ataque ────────────────────────────────────────────
+  // Sound on result
   useEffect(() => {
     if (phase === 'round-result' && roundWinner) {
-      if (roundWinner === 'player') playWinRoundSound();
-      else if (roundWinner === 'bot') playLoseRoundSound();
-      // Ativa animação de ataque após um pequeno delay
-      const t = setTimeout(() => setIsAttacking(true), 100);
+      roundWinner === 'player' ? playWinRoundSound() : roundWinner === 'bot' ? playLoseRoundSound() : null;
+      setShowDamage(true);
+      const t = setTimeout(() => setShowDamage(false), 2000);
       return () => clearTimeout(t);
-    } else if (phase !== 'round-result') {
-      setIsAttacking(false);
     }
   }, [phase, roundWinner]);
 
   useEffect(() => {
     if (phase === 'game-over' && gameWinner) {
-      if (gameWinner === 'player') playGameWinSound();
-      else playGameLoseSound();
+      gameWinner === 'player' ? playGameWinSound() : playGameLoseSound();
     }
   }, [phase, gameWinner]);
 
@@ -420,18 +573,10 @@ const DuelBattle: React.FC = () => {
 
   const handlePressReady = useCallback(() => {
     if (selectedPlayerCards.length > 0) playReadySound();
-    else playCardPlaySound();
     pressReady();
   }, [pressReady, selectedPlayerCards.length]);
 
-  // ── Mana: mana gasta e disponível ────────────────────────────────────────
-  const spentMana = useMemo(
-    () => selectedPlayerCards.reduce((s, c) => s + getCardCost(c.rarity), 0),
-    [selectedPlayerCards],
-  );
-  const availableMana = currentMana - spentMana;
-
-  // ── Detecção de par fusível (2 cartas selecionadas de mesma raridade) ────
+  // Fusion detection
   const fusablePair = useMemo<[TrophyCard, TrophyCard] | null>(() => {
     for (let i = 0; i < selectedPlayerCards.length; i++) {
       for (let j = i + 1; j < selectedPlayerCards.length; j++) {
@@ -443,319 +588,288 @@ const DuelBattle: React.FC = () => {
     return null;
   }, [selectedPlayerCards]);
 
-  // ── Totais de dano ────────────────────────────────────────────────────────
-  const playerTotal = useMemo(
-    () => selectedPlayerCards.reduce((s, c) => s + c.damage, 0),
-    [selectedPlayerCards],
-  );
-  const botTotal = useMemo(
-    () => selectedBotCards.reduce((s, c) => s + c.damage, 0),
-    [selectedBotCards],
-  );
+  const playerTotal = useMemo(() => selectedPlayerCards.reduce((s, c) => s + c.damage, 0), [selectedPlayerCards]);
+  const botTotal    = useMemo(() => selectedBotCards.reduce((s, c) => s + c.damage, 0),    [selectedBotCards]);
 
-  // ── Timer visual ──────────────────────────────────────────────────────────
   const timerPct   = (timeLeft / 30) * 100;
   const timerColor = timeLeft <= 5 ? '#f87171' : timeLeft <= 10 ? '#fbbf24' : '#4ade80';
+  const nextDraw   = 4 - selectedPlayerCards.length;
 
-  // ── Compra do próximo turno ───────────────────────────────────────────────
-  const nextDraw = 4 - selectedPlayerCards.length;
-
-  // ─────────────────────────────────────────────────────────────────────────
+  // ──────────────────────────────────────────────────────────────────────────
   // GAME OVER
-  // ─────────────────────────────────────────────────────────────────────────
+  // ──────────────────────────────────────────────────────────────────────────
   if (phase === 'game-over') {
     const won = gameWinner === 'player';
     return (
-      <div className="hs-gameover">
+      <div className="hs-gameover bd-gameover">
+        <div className="bd-gameover-particles" aria-hidden="true">
+          {Array.from({ length: 20 }).map((_, i) => (
+            <div key={i} className="bd-particle" style={{ '--i': i } as React.CSSProperties} />
+          ))}
+        </div>
         <div className="hs-gameover-icon">{won ? '🏆' : '💀'}</div>
         <h2 className="hs-gameover-title" style={{ color: won ? '#4ade80' : '#f87171' }}>
           {won ? 'Vitória!' : 'Derrota!'}
         </h2>
         <p className="hs-gameover-sub">
-          {won
-            ? 'Suas conquistas dominaram o campo de batalha!'
-            : 'O bot foi mais forte desta vez. Tente novamente!'}
+          {won ? 'Suas conquistas dominaram o campo de batalha!' : 'O bot foi mais forte desta vez!'}
         </p>
-
-        {/* HP final */}
         <div className="hs-gameover-hp">
           <div className="hs-gameover-hp-side">
-            <div className="hs-gameover-hp-label">💙 Você</div>
-            <div className="hs-gameover-hp-val" style={{ color: won ? '#4ade80' : '#f87171' }}>
+            <span className="hs-gameover-hp-label">💙 Você</span>
+            <span className="hs-gameover-hp-val" style={{ color: won ? '#4ade80' : '#f87171' }}>
               {playerHp > 0 ? playerHp.toLocaleString() : '💀 0'}
-            </div>
+            </span>
           </div>
-          <div className="hs-gameover-hp-div">❤️</div>
+          <div className="hs-gameover-hp-div">⚔️</div>
           <div className="hs-gameover-hp-side">
-            <div className="hs-gameover-hp-label">🤖 Bot</div>
-            <div className="hs-gameover-hp-val" style={{ color: !won ? '#4ade80' : '#f87171' }}>
+            <span className="hs-gameover-hp-label">🤖 Bot</span>
+            <span className="hs-gameover-hp-val" style={{ color: !won ? '#4ade80' : '#f87171' }}>
               {botHp > 0 ? botHp.toLocaleString() : '💀 0'}
-            </div>
+            </span>
           </div>
         </div>
-
-        <button
-          className="hs-btn-primary"
-          onClick={resetBattle}
-          onMouseEnter={playHoverSound}
-        >
+        <button className="hs-btn-primary" onClick={resetBattle} onMouseEnter={playHoverSound}>
           🔄 Jogar Novamente
         </button>
       </div>
     );
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // ──────────────────────────────────────────────────────────────────────────
   // ROUND RESULT
-  // ─────────────────────────────────────────────────────────────────────────
+  // ──────────────────────────────────────────────────────────────────────────
   if (phase === 'round-result') {
     const playerWon = roundWinner === 'player';
     const botWon    = roundWinner === 'bot';
     const isDraw    = roundWinner === 'draw';
-
     return (
       <div className="hs-round-result">
-
-        {/* Título com dano */}
         <div className="hs-round-result-title">
-          {isDraw
-            ? '🤝 Empate! Nenhum dano causado.'
-            : playerWon
-            ? `✅ Você venceu! Bot tomou ${damageDealt.toLocaleString()} de dano.`
-            : `❌ Bot venceu! Você tomou ${damageDealt.toLocaleString()} de dano.`}
+          {isDraw ? '🤝 Empate! Nenhum dano.' :
+           playerWon ? `✅ Você venceu! Bot tomou ${damageDealt.toLocaleString()} de dano.` :
+           `❌ Bot venceu! Você tomou ${damageDealt.toLocaleString()} de dano.`}
         </div>
-
-        {/* Barras de HP atualizadas */}
         <div className="hs-round-result-hp">
-          <HpBar hp={playerHp} label="💙 Você" damaged={damageTarget === 'player'} />
-          <div style={{ fontSize: 22, color: 'rgba(255,255,255,0.2)', padding: '0 12px', alignSelf: 'center' }}>
-            ⚔
-          </div>
-          <HpBar hp={botHp} label="🤖 Bot" damaged={damageTarget === 'bot'} />
+          <HpBar hp={playerHp} label="💙 Você"  side="player" showDamage={damageTarget === 'player' ? damageDealt : undefined} />
+          <div style={{ fontSize: 22, color: 'rgba(255,255,255,0.2)', padding: '0 12px', alignSelf: 'center' }}>⚔</div>
+          <HpBar hp={botHp}    label="🤖 Bot"   side="bot"    showDamage={damageTarget === 'bot'    ? damageDealt : undefined} />
         </div>
-
-        {/* Cartas jogadas lado a lado */}
         <div className="hs-result-arena">
-          <ArenaColumn
-            cards={selectedPlayerCards}
-            total={playerTotal}
-            isWinner={playerWon}
-            label="Suas cartas"
-            isAttacking={isAttacking && playerWon}
-            isDestroyed={isAttacking && botWon}
-          />
+          <ArenaColumn cards={selectedPlayerCards} total={playerTotal} isWinner={playerWon} label="Suas cartas" />
           <div className="hs-arena-vs">VS</div>
-          <ArenaColumn
-            cards={selectedBotCards}
-            total={botTotal}
-            isWinner={botWon}
-            label="Bot"
-            isAttacking={isAttacking && botWon}
-            isDestroyed={isAttacking && playerWon}
-          />
+          <ArenaColumn cards={selectedBotCards}    total={botTotal}    isWinner={botWon}    label="Bot" />
         </div>
-
-        <button
-          className="hs-btn-primary"
-          onClick={nextRound}
-          onMouseEnter={playHoverSound}
-        >
+        <button className="hs-btn-primary" onClick={nextRound} onMouseEnter={playHoverSound}>
           Próximo Round →
         </button>
       </div>
     );
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // BATTLE PHASE
-  // ─────────────────────────────────────────────────────────────────────────
+  // ──────────────────────────────────────────────────────────────────────────
+  // BATTLE PHASE — The Board
+  // ──────────────────────────────────────────────────────────────────────────
   return (
-    <div className="hs-battle">
+    <div className="bd-root">
 
-      {/* ── HUD: HP + Round + Mana + Timer ── */}
-      <div className="hs-battle-header">
+      {/* ── Ambient board background ── */}
+      <div className="bd-board-bg" aria-hidden="true">
+        <div className="bd-board-texture" />
+        <div className="bd-board-vignette" />
+        {/* Floating particles */}
+        {Array.from({ length: 12 }).map((_, i) => (
+          <div key={i} className="bd-ambient-particle" style={{ '--i': i } as React.CSSProperties} />
+        ))}
+      </div>
 
-        {/* HP do jogador */}
-        <HpBar hp={playerHp} label="💙 Você" />
+      {/* ── Ghost card following cursor ── */}
+      {drag.card && (
+        <GhostCard
+          card={drag.card}
+          x={drag.x} y={drag.y}
+          isOverZone={drag.isOverDropZone}
+          isSnapBack={drag.isSnapBack}
+          originX={drag.originX}
+          originY={drag.originY}
+        />
+      )}
 
-        {/* Centro: Round + Mana */}
-        <div className="hs-hud-center">
-          <div className="hs-hud-round">
+      {/* ═══════════════════════════════════════════════════════════════
+          TOP HUD
+      ═══════════════════════════════════════════════════════════════ */}
+      <div className="bd-hud">
+        <HpBar hp={playerHp} label="Você" side="player" />
+
+        <div className="bd-hud-center">
+          <div className="bd-hud-round">
             <span className="hs-hud-label">Round</span>
             <span className="hs-hud-val">{round}</span>
           </div>
-          <ManaGems total={maxMana} spent={maxMana - availableMana} />
-        </div>
-
-        {/* HP do bot */}
-        <HpBar hp={botHp} label="🤖 Bot" />
-
-        {/* Timer ring */}
-        <div className="hs-hud-block">
-          <div className="hs-hud-label">Tempo</div>
+          <ManaCrystals total={currentMana} spent={spentMana} />
+          {/* Timer */}
           <div className="hs-hud-timer">
             <span style={{ color: timerColor, fontWeight: 900, fontSize: 15, position: 'relative', zIndex: 1 }}>
               {timeLeft}s
             </span>
             <svg className="hs-timer-ring" viewBox="0 0 44 44">
-              <circle cx="22" cy="22" r="18" fill="none" stroke="var(--b2, #223344)" strokeWidth="3" />
+              <circle cx="22" cy="22" r="18" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="3" />
               <circle
                 cx="22" cy="22" r="18"
-                fill="none"
-                stroke={timerColor}
-                strokeWidth="3"
+                fill="none" stroke={timerColor} strokeWidth="3"
                 strokeDasharray={`${2 * Math.PI * 18}`}
                 strokeDashoffset={`${2 * Math.PI * 18 * (1 - timerPct / 100)}`}
-                strokeLinecap="round"
-                transform="rotate(-90 22 22)"
+                strokeLinecap="round" transform="rotate(-90 22 22)"
                 style={{ transition: 'stroke-dashoffset 1s linear, stroke 0.3s' }}
               />
             </svg>
           </div>
         </div>
+
+        <HpBar hp={botHp} label="Bot" side="bot" />
       </div>
 
-      {/* ── Bot zone ── */}
-      <div className="hs-bot-zone">
-        <div className="hs-bot-zone-label">
-          🤖 Bot — {botHand.length} carta{botHand.length !== 1 ? 's' : ''}
+      {/* ═══════════════════════════════════════════════════════════════
+          BOT SECTION (top)
+      ═══════════════════════════════════════════════════════════════ */}
+      <div className="bd-bot-section">
+        {/* Bot hand */}
+        <div className="bd-bot-hand-row">
+          <div className="hs-bot-hand">
+            {botHand.map((_, i) => (
+              <BotFaceDown key={i} fanStyle={botFan.getCardStyle(i)} />
+            ))}
+          </div>
           {isPlayerReady && selectedBotCards.length === 0 && (
-            <span className="hs-bot-thinking"> escolhendo…</span>
+            <div className="bd-bot-thinking">🤖 <span className="hs-bot-thinking">escolhendo…</span></div>
           )}
         </div>
-        <div className="hs-bot-hand">
-          {botHand.map((_, i) => (
-            <BotFaceDown key={i} fanStyle={botFan.getCardStyle(i)} />
+
+        {/* Bot board slots */}
+        <div className="bd-board-row bd-board-row--bot">
+          {Array.from({ length: MAX_SLOTS }).map((_, i) => (
+            <BoardSlot
+              key={i}
+              card={selectedBotCards[i] ?? null}
+              side="bot"
+            />
           ))}
         </div>
       </div>
 
-      {/* ── Arena ── */}
-      <div className="hs-arena">
-        {selectedPlayerCards.length > 0 || isPlayerReady ? (
-          <div className="hs-arena-live">
-            <div className="hs-arena-live-side">
-              <div className="hs-arena-live-label">
-                Você · <strong style={{ color: '#4ade80' }}>{playerTotal}</strong> ⚔
-              </div>
-              <div className="hs-arena-live-cards">
-                {selectedPlayerCards.map(c => <ArenaCard key={c.id} card={c} />)}
-              </div>
-            </div>
-            <div className="hs-arena-vs">VS</div>
-            <div className="hs-arena-live-side">
-              <div className="hs-arena-live-label">Bot</div>
-              <div className="hs-arena-live-cards">
-                {isPlayerReady && selectedBotCards.length === 0 ? (
-                  <div className="hs-arena-slot-empty">
-                    <span className="hs-bot-thinking">⏳</span>
-                  </div>
-                ) : (
-                  selectedBotCards.map(c => <ArenaCard key={c.id} card={c} />)
-                )}
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="hs-arena-hint">
-            Selecione cartas da sua mão e clique em <strong>Pronto</strong>
-            <br />
-            <span style={{ fontSize: 12, opacity: 0.7 }}>
-              Você tem <strong style={{ color: '#60a5fa' }}>{availableMana}</strong>/{maxMana} de mana
-            </span>
-          </div>
-        )}
-      </div>
+      {/* ═══════════════════════════════════════════════════════════════
+          CENTER DIVIDER
+      ═══════════════════════════════════════════════════════════════ */}
+      <BoardCenter
+        playerTotal={playerTotal}
+        botTotal={botTotal}
+        isReady={isPlayerReady}
+        botReady={selectedBotCards.length > 0}
+      />
 
-      {/* ── Player zone ── */}
-      <div className="hs-player-zone">
+      {/* ═══════════════════════════════════════════════════════════════
+          PLAYER SECTION (bottom)
+      ═══════════════════════════════════════════════════════════════ */}
+      <div className="bd-player-section">
 
-        {/* Barra de ação */}
-        <div className="hs-ready-bar">
-          <div className="hs-ready-info">
+        {/* Player board slots + drop zone */}
+        <div
+          ref={dropZoneRef}
+          className={[
+            'bd-board-row bd-board-row--player',
+            drag.card ? 'bd-board-row--drag-active' : '',
+            drag.isOverDropZone ? 'bd-board-row--drop-ready' : '',
+          ].filter(Boolean).join(' ')}
+        >
+          {Array.from({ length: MAX_SLOTS }).map((_, i) => (
+            <BoardSlot
+              key={i}
+              card={selectedPlayerCards[i] ?? null}
+              side="player"
+              isTarget={!!(drag.card && !selectedPlayerCards[i])}
+              isWinner={false}
+            />
+          ))}
+          {/* Drop zone hint label */}
+          {drag.card && selectedPlayerCards.length < MAX_SLOTS && (
+            <div className="bd-drop-hint">Solte a carta aqui</div>
+          )}
+        </div>
+
+        {/* Ready bar */}
+        <div className="bd-action-bar">
+          <div className="bd-action-left">
             {isPlayerReady ? (
-              <span style={{ color: '#4ade80' }}>✅ Aguardando bot…</span>
+              <span style={{ color: '#4ade80', fontSize: 13 }}>✅ Aguardando bot…</span>
             ) : (
               <>
-                <span>{selectedPlayerCards.length}/3 cartas</span>
-                <span className="hs-draw-preview">
-                  → próx. turno: +{nextDraw} carta{nextDraw !== 1 ? 's' : ''}
+                <span style={{ fontSize: 12, color: 'var(--txt2)' }}>
+                  {selectedPlayerCards.length}/3 no campo
                 </span>
-                <span className="hs-mana-spent-badge">
-                  💧 {maxMana - availableMana}/{maxMana}
-                </span>
+                <span className="hs-draw-preview">+{nextDraw} cartas</span>
+                <span className="bd-mana-cost-label">💧 {spentMana}/{currentMana}</span>
               </>
             )}
           </div>
 
-          {/* Botão de fusão — aparece quando há par fusível */}
-          {!isPlayerReady && fusablePair && !isFusing && (
-            <button
-              className="hs-btn-fuse"
-              onClick={() => {
-                playFuseSound();
-                setIsFusing(true);
-                setFusingIds([fusablePair[0].id, fusablePair[1].id]);
-                // Aguarda animação antes de fundir
-                setTimeout(() => {
-                  fuseCards(fusablePair[0].id, fusablePair[1].id);
-                  setIsFusing(false);
-                  setFusingIds([]);
-                }, 600);
-              }}
-              onMouseEnter={playHoverSound}
-              title={`Fundir 2 cartas ${fusablePair[0].rarity} → ${fusablePair[0].rarity} superior`}
-            >
-              ✨ Fundir {fusablePair[0].rarityEmoji}{fusablePair[1].rarityEmoji}
-            </button>
-          )}
+          <div className="bd-action-right">
+            {/* Fusion button */}
+            {!isPlayerReady && fusablePair && (
+              <button
+                className="hs-btn-fuse"
+                onClick={() => { playCardSelectSound(); fuseCards(fusablePair[0].id, fusablePair[1].id); }}
+                onMouseEnter={playHoverSound}
+              >
+                ✨ Fundir {fusablePair[0].rarityEmoji}{fusablePair[1].rarityEmoji}
+              </button>
+            )}
 
-          {!isPlayerReady && (
-            <button
-              className={`hs-btn-ready${selectedPlayerCards.length > 0 ? ' hs-btn-ready--active' : ''}`}
-              onClick={handlePressReady}
-              onMouseEnter={playHoverSound}
-            >
-              {selectedPlayerCards.length === 0
-                ? 'Passar turno'
-                : `Pronto (${selectedPlayerCards.length} carta${selectedPlayerCards.length > 1 ? 's' : ''})`}
-            </button>
-          )}
+            {!isPlayerReady && (
+              <button
+                className={`hs-btn-ready${selectedPlayerCards.length > 0 ? ' hs-btn-ready--active' : ''}`}
+                onClick={handlePressReady}
+                onMouseEnter={playHoverSound}
+              >
+                {selectedPlayerCards.length === 0
+                  ? 'Passar turno'
+                  : `Pronto (${selectedPlayerCards.length})`}
+              </button>
+            )}
+          </div>
         </div>
 
-        {/* Mão em leque */}
+        {/* Player hand */}
         <div className="hs-player-hand">
           {playerHand.map((card, i) => {
-            const selIdx        = selectedPlayerCards.findIndex(c => c.id === card.id);
-            const selOrder      = selIdx >= 0 ? selIdx + 1 : 0;
-            const alreadySelected = selOrder > 0;
-            const maxReached    = selectedPlayerCards.length >= 3;
-            const cardCost      = getCardCost(card.rarity);
-            const canAfford     = spentMana + cardCost <= currentMana;
-            // noMana: quando não é selecionada e não cabe na mana
-            const noMana        = !alreadySelected && !canAfford;
-            const canSelect     = !isPlayerReady && !alreadySelected && !maxReached && canAfford;
-            const canDeselect   = !isPlayerReady && alreadySelected;
+            const selIdx       = selectedPlayerCards.findIndex(c => c.id === card.id);
+            const selOrder     = selIdx >= 0 ? selIdx + 1 : 0;
+            const alreadySel   = selOrder > 0;
+            const maxReached   = selectedPlayerCards.length >= 3;
+            const cost         = getCardCost(card.rarity);
+            const canAfford    = spentMana + cost <= currentMana;
+            const noMana       = !alreadySel && !canAfford;
+            const canSelect    = !isPlayerReady && !alreadySel && !maxReached && canAfford;
+            const canDeselect  = !isPlayerReady && alreadySel;
+            const isDragging   = drag.card?.id === card.id;
 
             return (
               <HandCard
                 key={card.id}
                 card={card}
-                index={i}
-                total={playerHand.length}
                 fanStyle={playerFan.getCardStyle(i)}
                 selOrder={selOrder}
                 canSelect={canSelect}
                 canDeselect={canDeselect}
                 noMana={noMana}
+                isDragging={isDragging}
+                onStartDrag={e => startDrag(card, e)}
                 onToggle={() => handleToggle(card)}
-                isFusingCard={fusingIds.includes(card.id)}
               />
             );
           })}
         </div>
-      </div>
 
+      </div>
     </div>
   );
 };

@@ -1,0 +1,751 @@
+/* =============================================================
+   battle-board.css  (v4 — Board Edition)
+
+   Adicione no final do seu battle.css existente, OU importe
+   separadamente em main.tsx depois do battle.css:
+     import './styles/battle-board.css';
+
+   Todos os seletores novos usam o prefixo "bd-" para não
+   colidir com os "hs-" existentes.
+   ============================================================= */
+
+/* ─── Root layout ─────────────────────────────────────────── */
+
+/*
+ * bd-root: substitui .hs-battle como container raiz.
+ * Grid de 5 linhas: HUD | Bot | Center | Player | Hand
+ */
+.bd-root {
+  display            : grid;
+  grid-template-rows : 64px 1fr 32px 1fr auto;
+  height             : calc(100vh - 170px);
+  min-height         : 600px;
+  position           : relative;
+  overflow           : hidden;
+  user-select        : none;
+}
+
+/* ─── Ambient board background ────────────────────────────── */
+
+.bd-board-bg {
+  position      : absolute;
+  inset         : 0;
+  z-index       : 0;
+  pointer-events: none;
+  overflow      : hidden;
+}
+
+/* Fantasy stone texture via layered gradients */
+.bd-board-texture {
+  position  : absolute;
+  inset     : 0;
+  background:
+    radial-gradient(ellipse 120% 60% at 50% 50%, rgba(20,40,70,0.6) 0%, transparent 70%),
+    repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 80px,
+      rgba(255,255,255,0.015) 80px,
+      rgba(255,255,255,0.015) 81px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      transparent,
+      transparent 80px,
+      rgba(255,255,255,0.015) 80px,
+      rgba(255,255,255,0.015) 81px
+    ),
+    linear-gradient(180deg, #0a1628 0%, #071020 40%, #0a1628 100%);
+}
+
+/* Dark vignette edges */
+.bd-board-vignette {
+  position  : absolute;
+  inset     : 0;
+  background: radial-gradient(ellipse at 50% 50%, transparent 40%, rgba(0,0,0,0.6) 100%);
+}
+
+/* Floating ambient particles */
+.bd-ambient-particle {
+  position        : absolute;
+  width           : 3px;
+  height          : 3px;
+  border-radius   : 50%;
+  background      : rgba(96, 165, 250, 0.4);
+  animation       : bd-float calc(6s + var(--i, 0) * 0.7s) ease-in-out infinite;
+  animation-delay : calc(var(--i, 0) * 0.5s);
+  left            : calc(5% + var(--i, 0) * 8%);
+  bottom          : 20%;
+  filter          : blur(0.5px);
+}
+
+.bd-ambient-particle:nth-child(odd) {
+  background: rgba(192, 132, 252, 0.3);
+  width: 2px; height: 2px;
+}
+
+@keyframes bd-float {
+  0%   { transform: translateY(0)     opacity: 0; }
+  10%  { opacity: 1; }
+  90%  { opacity: 0.4; }
+  100% { transform: translateY(-80vh); opacity: 0; }
+}
+
+/* ─── HUD ─────────────────────────────────────────────────── */
+
+.bd-hud {
+  display        : flex;
+  align-items    : center;
+  justify-content: space-between;
+  padding        : 0 16px;
+  z-index        : 10;
+  position       : relative;
+  background     : rgba(0,0,0,0.55);
+  backdrop-filter: blur(8px);
+  border-bottom  : 1px solid rgba(255,255,255,0.06);
+  gap            : 12px;
+}
+
+.bd-hud-center {
+  display       : flex;
+  flex-direction: column;
+  align-items   : center;
+  gap           : 4px;
+}
+
+.bd-hud-round {
+  display  : flex;
+  gap      : 6px;
+  align-items: center;
+}
+
+/* HP block */
+.bd-hp-block {
+  display    : flex;
+  align-items: center;
+  gap        : 8px;
+  flex       : 1;
+  max-width  : 200px;
+}
+
+.bd-hp-block--bot { flex-direction: row-reverse; }
+
+.bd-hp-avatar {
+  font-size  : 22px;
+  flex-shrink: 0;
+}
+
+.bd-hp-info {
+  flex   : 1;
+  min-width: 0;
+}
+
+.bd-hp-label {
+  font-size  : 10px;
+  color      : var(--txt3, #556677);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.bd-hp-track {
+  width        : 100%;
+  height       : 7px;
+  background   : rgba(255,255,255,0.08);
+  border-radius: 99px;
+  overflow     : hidden;
+  margin       : 3px 0;
+}
+
+.bd-hp-fill {
+  height       : 100%;
+  border-radius: 99px;
+  transition   : width 0.6s ease, background 0.3s;
+  position     : relative;
+}
+
+/* Shimmer on HP bar */
+.bd-hp-fill::after {
+  content : '';
+  position: absolute;
+  top     : 0; left: 0; right: 0; bottom: 0;
+  background: linear-gradient(90deg, transparent 30%, rgba(255,255,255,0.25) 50%, transparent 70%);
+  background-size: 200% 100%;
+  animation: bd-hp-shimmer 3s linear infinite;
+}
+
+@keyframes bd-hp-shimmer {
+  from { background-position:  200% 0; }
+  to   { background-position: -200% 0; }
+}
+
+.bd-hp-val {
+  font-size  : 12px;
+  font-weight: 700;
+  transition : color 0.3s;
+  position   : relative;
+}
+
+/* Damage float */
+.bd-hp-damage-float {
+  position : absolute;
+  left     : calc(100% + 4px);
+  top      : -4px;
+  font-size: 14px;
+  font-weight: 900;
+  color    : #f87171;
+  animation: bd-damage-float 1.8s ease-out both;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+@keyframes bd-damage-float {
+  0%   { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(-28px); }
+}
+
+/* ─── Mana Crystals ───────────────────────────────────────── */
+
+.bd-mana-crystals {
+  display    : flex;
+  align-items: center;
+  gap        : 3px;
+}
+
+.bd-mana-crystals--sm .bd-mana-gem { width: 8px; height: 8px; }
+.bd-mana-crystals--md .bd-mana-gem { width: 11px; height: 11px; }
+
+.bd-mana-gem {
+  border-radius : 50%;
+  border        : 1px solid rgba(255,255,255,0.2);
+  transition    : background 0.3s, transform 0.2s, box-shadow 0.2s;
+  animation     : bd-mana-appear 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@keyframes bd-mana-appear {
+  from { transform: scale(0); opacity: 0; }
+  to   { transform: scale(1); opacity: 1; }
+}
+
+.bd-mana-gem--full {
+  background: #3b82f6;
+  box-shadow : 0 0 6px rgba(59,130,246,0.7), 0 0 12px rgba(59,130,246,0.35);
+  transform  : scale(1.1);
+}
+
+.bd-mana-gem--spent {
+  background: rgba(59,130,246,0.12);
+}
+
+.bd-mana-overflow {
+  font-size  : 11px;
+  color      : #60a5fa;
+  font-weight: 700;
+  margin-left: 3px;
+}
+
+.bd-mana-val {
+  font-size  : 11px;
+  font-weight: 700;
+  color      : #60a5fa;
+  margin-left: 5px;
+  white-space: nowrap;
+}
+
+/* ─── Bot Section ─────────────────────────────────────────── */
+
+.bd-bot-section {
+  display       : flex;
+  flex-direction: column;
+  align-items   : center;
+  justify-content: flex-end;
+  gap           : 8px;
+  padding       : 8px 16px 0;
+  position      : relative;
+  z-index       : 5;
+}
+
+.bd-bot-hand-row {
+  display    : flex;
+  align-items: center;
+  gap        : 16px;
+  justify-content: center;
+}
+
+.bd-bot-thinking {
+  font-size: 12px;
+  color    : var(--txt2, #8899aa);
+}
+
+/* ─── Board Rows (card slots) ─────────────────────────────── */
+
+.bd-board-row {
+  display        : flex;
+  align-items    : center;
+  justify-content: center;
+  gap            : 12px;
+  padding        : 6px 16px;
+  position       : relative;
+  z-index        : 5;
+  min-height     : 160px;
+}
+
+/* Drop zone states */
+.bd-board-row--player {
+  border-radius: 16px 16px 0 0;
+  transition   : background 0.2s, box-shadow 0.2s;
+}
+
+.bd-board-row--drag-active {
+  background: rgba(58, 122, 204, 0.06);
+}
+
+.bd-board-row--drop-ready {
+  background: rgba(58, 122, 204, 0.14);
+  box-shadow : inset 0 0 0 2px rgba(58, 122, 204, 0.5);
+}
+
+/* Drop hint text */
+.bd-drop-hint {
+  position      : absolute;
+  bottom        : -24px;
+  left          : 50%;
+  transform     : translateX(-50%);
+  font-size     : 11px;
+  color         : var(--accent, #3a7acc);
+  white-space   : nowrap;
+  pointer-events: none;
+  animation     : hs-pulse 1s ease-in-out infinite;
+}
+
+/* ─── Board Slot ──────────────────────────────────────────── */
+
+.bd-board-slot {
+  width        : 130px;
+  height       : 150px;
+  border-radius: 12px;
+  position     : relative;
+  flex-shrink  : 0;
+  transition   : transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+/* Empty slot */
+.bd-board-slot--empty {
+  border      : 2px dashed rgba(255,255,255,0.1);
+  display     : flex;
+  align-items : center;
+  justify-content: center;
+  background  : rgba(255,255,255,0.02);
+}
+
+.bd-board-slot--player.bd-board-slot--empty {
+  border-color: rgba(58,122,204,0.25);
+  background  : rgba(58,122,204,0.04);
+}
+
+.bd-board-slot--bot.bd-board-slot--empty {
+  border-color: rgba(248,113,113,0.2);
+  background  : rgba(248,113,113,0.02);
+}
+
+/* Target ring — pulses when a card is being dragged */
+.bd-slot-target-ring {
+  position     : absolute;
+  inset        : -3px;
+  border-radius: 14px;
+  border       : 2px solid var(--accent, #3a7acc);
+  animation    : bd-slot-pulse 0.9s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes bd-slot-pulse {
+  0%, 100% { opacity: 0.5; box-shadow: 0 0 0   0 rgba(58,122,204,0.2); }
+  50%       { opacity: 1;   box-shadow: 0 0 12px 4px rgba(58,122,204,0.5); }
+}
+
+.bd-slot-hint {
+  font-size: 11px;
+  color    : var(--txt3, #556677);
+  text-align: center;
+}
+
+/* Filled slot */
+.bd-board-slot--filled {
+  background   : linear-gradient(180deg, rgba(20,35,55,0.9) 0%, rgba(8,18,32,0.95) 100%);
+  border       : 2px solid var(--rarity-color, #9ca3af);
+  box-shadow   : 0 6px 20px rgba(0,0,0,0.5),
+                 0 0 12px color-mix(in srgb, var(--rarity-color, #9ca3af) 20%, transparent);
+  display      : flex;
+  flex-direction: column;
+  overflow     : hidden;
+  animation    : bd-slot-land 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@keyframes bd-slot-land {
+  from { opacity: 0; transform: scale(0.7) translateY(-20px); }
+  to   { opacity: 1; transform: scale(1)   translateY(0); }
+}
+
+.bd-board-slot--filled:hover {
+  transform : translateY(-3px);
+  box-shadow: 0 12px 28px rgba(0,0,0,0.5),
+              0 0 20px color-mix(in srgb, var(--rarity-color, #9ca3af) 35%, transparent);
+}
+
+.bd-board-slot--winner {
+  box-shadow: 0 0 30px color-mix(in srgb, var(--rarity-color, #9ca3af) 60%, transparent),
+              0 6px 20px rgba(0,0,0,0.5);
+}
+
+/* Slot cost badge */
+.bd-slot-cost {
+  position       : absolute;
+  top            : 5px;
+  left           : 5px;
+  z-index        : 3;
+  width          : 20px;
+  height         : 20px;
+  border-radius  : 50%;
+  display        : flex;
+  align-items    : center;
+  justify-content: center;
+  font-size      : 10px;
+  font-weight    : 900;
+  color          : #000;
+  box-shadow     : 0 2px 4px rgba(0,0,0,0.5);
+}
+
+/* Slot art area */
+.bd-slot-art {
+  position : relative;
+  height   : 72px;
+  overflow : hidden;
+  flex-shrink: 0;
+}
+
+.bd-slot-art-bg {
+  position           : absolute;
+  inset              : 0;
+  background-size    : cover;
+  background-position: center;
+  filter             : blur(4px) brightness(0.35);
+  transform          : scale(1.1);
+}
+
+.bd-slot-art-icon {
+  position     : absolute;
+  top          : 50%;
+  left         : 50%;
+  transform    : translate(-50%, -50%);
+  width        : 44px;
+  height       : 44px;
+  border-radius: 8px;
+  object-fit   : contain;
+  filter       : drop-shadow(0 2px 6px rgba(0,0,0,0.7));
+  z-index      : 1;
+}
+
+.bd-slot-art-emoji {
+  position       : absolute;
+  top            : 50%;
+  left           : 50%;
+  transform      : translate(-50%, -50%);
+  font-size      : 28px;
+  z-index        : 1;
+  width          : 44px;
+  height         : 44px;
+  display        : flex;
+  align-items    : center;
+  justify-content: center;
+  border-radius  : 8px;
+  background     : rgba(0,0,0,0.4);
+}
+
+.bd-slot-rarity-badge {
+  position      : absolute;
+  top           : 5px;
+  right         : 5px;
+  z-index       : 2;
+  background    : rgba(0,0,0,0.72);
+  border-radius : 3px;
+  padding       : 1px 5px;
+  font-size     : 8px;
+  font-weight   : 700;
+  letter-spacing: 0.8px;
+}
+
+/* Slot info */
+.bd-slot-info {
+  flex   : 1;
+  padding: 5px 7px 2px;
+}
+
+.bd-slot-name {
+  font-size          : 11px;
+  font-weight        : 700;
+  color              : #fff;
+  line-height        : 1.2;
+  display            : -webkit-box;
+  -webkit-line-clamp : 2;
+  line-clamp         : 2;
+  -webkit-box-orient : vertical;
+  overflow           : hidden;
+}
+
+.bd-slot-game {
+  font-size    : 9px;
+  color        : var(--txt3, #556677);
+  white-space  : nowrap;
+  overflow     : hidden;
+  text-overflow: ellipsis;
+  margin-top   : 1px;
+}
+
+/* Damage */
+.bd-slot-damage {
+  padding    : 4px 7px;
+  font-size  : 13px;
+  font-weight: 900;
+  border-top : 1px solid rgba(255,255,255,0.06);
+  display    : flex;
+  align-items: center;
+  gap        : 3px;
+  background : rgba(0,0,0,0.3);
+}
+
+.bd-slot-pct {
+  font-size  : 9px;
+  font-weight: 400;
+  opacity    : 0.65;
+}
+
+/* Winner glow */
+.bd-slot-winner-glow {
+  position      : absolute;
+  inset         : -3px;
+  border-radius : 14px;
+  border        : 3px solid var(--rarity-color, #fff);
+  pointer-events: none;
+  animation     : hs-winner-pulse 0.6s ease-in-out infinite alternate;
+}
+
+/* ─── Board Center Divider ────────────────────────────────── */
+
+.bd-center {
+  display        : flex;
+  align-items    : center;
+  justify-content: center;
+  position       : relative;
+  z-index        : 5;
+  gap            : 16px;
+  padding        : 0 16px;
+}
+
+.bd-center-line {
+  position       : absolute;
+  left           : 0;
+  right          : 0;
+  height         : 1px;
+  background     : linear-gradient(90deg, transparent, rgba(58,122,204,0.4) 30%, rgba(58,122,204,0.6) 50%, rgba(58,122,204,0.4) 70%, transparent);
+  display        : flex;
+  align-items    : center;
+  justify-content: center;
+}
+
+.bd-center-gem {
+  width       : 12px;
+  height      : 12px;
+  border-radius: 50%;
+  background   : rgba(58,122,204,0.8);
+  box-shadow   : 0 0 12px rgba(58,122,204,0.8), 0 0 24px rgba(58,122,204,0.4);
+  position     : relative;
+  z-index      : 2;
+  animation    : bd-gem-pulse 2s ease-in-out infinite;
+}
+
+@keyframes bd-gem-pulse {
+  0%, 100% { box-shadow: 0 0 6px rgba(58,122,204,0.6); }
+  50%       { box-shadow: 0 0 18px rgba(58,122,204,0.9), 0 0 36px rgba(58,122,204,0.4); }
+}
+
+.bd-center-totals {
+  display    : flex;
+  align-items: center;
+  gap        : 6px;
+  z-index    : 3;
+  background : rgba(0,0,0,0.6);
+  border     : 1px solid rgba(255,255,255,0.1);
+  border-radius: 20px;
+  padding    : 4px 14px;
+  backdrop-filter: blur(6px);
+}
+
+.bd-center-total {
+  font-size  : 18px;
+  font-weight: 900;
+  min-width  : 28px;
+  text-align : center;
+}
+
+.bd-center-vs {
+  font-size: 14px;
+  opacity  : 0.5;
+}
+
+.bd-center-status {
+  display: flex;
+  gap    : 8px;
+  z-index: 3;
+}
+
+.bd-ready-indicator {
+  font-size    : 10px;
+  font-weight  : 700;
+  padding      : 3px 8px;
+  border-radius: 4px;
+  animation    : hs-pulse 1.5s ease-in-out infinite;
+}
+
+.bd-ready-indicator--player {
+  background: rgba(74,222,128,0.15);
+  color     : #4ade80;
+  border    : 1px solid rgba(74,222,128,0.3);
+}
+
+.bd-ready-indicator--bot {
+  background: rgba(248,113,113,0.15);
+  color     : #f87171;
+  border    : 1px solid rgba(248,113,113,0.3);
+}
+
+/* ─── Player Section ──────────────────────────────────────── */
+
+.bd-player-section {
+  display       : flex;
+  flex-direction: column;
+  position      : relative;
+  z-index       : 5;
+  background    : rgba(0,0,0,0.3);
+  border-top    : 1px solid rgba(255,255,255,0.05);
+}
+
+/* Action bar: info + buttons */
+.bd-action-bar {
+  display        : flex;
+  align-items    : center;
+  justify-content: space-between;
+  padding        : 6px 16px 4px;
+  gap            : 12px;
+  flex-wrap      : wrap;
+}
+
+.bd-action-left {
+  display    : flex;
+  align-items: center;
+  gap        : 10px;
+  flex-wrap  : wrap;
+}
+
+.bd-action-right {
+  display    : flex;
+  align-items: center;
+  gap        : 8px;
+  flex-shrink: 0;
+}
+
+.bd-mana-cost-label {
+  font-size    : 11px;
+  color        : #60a5fa;
+  padding      : 3px 8px;
+  background   : rgba(59,130,246,0.1);
+  border       : 1px solid rgba(59,130,246,0.25);
+  border-radius: 4px;
+}
+
+/* ─── Ghost Card (follows cursor) ────────────────────────── */
+
+.bd-ghost-card {
+  pointer-events: none;
+  position      : fixed;
+  z-index       : 9999;
+}
+
+.bd-ghost-inner {
+  width         : var(--card-width, 140px);
+  height        : var(--card-height, 210px);
+  border-radius : 12px;
+  overflow      : hidden;
+  background    : linear-gradient(180deg, #1a2634 0%, #0d1b26 100%);
+  border        : 2px solid var(--rarity-color, #9ca3af);
+  display       : flex;
+  flex-direction: column;
+  position      : relative;
+  box-shadow    : 0 12px 40px rgba(0,0,0,0.7),
+                  0 0 20px color-mix(in srgb, var(--rarity-color, #9ca3af) 40%, transparent);
+  /* Slight tilt to make it feel "held" */
+  transform     : rotate(-4deg);
+}
+
+.bd-ghost-dropzone-glow {
+  position      : absolute;
+  inset         : -8px;
+  border-radius : 18px;
+  pointer-events: none;
+  animation     : bd-glow-pulse 0.5s ease-in-out infinite alternate;
+  z-index       : -1;
+}
+
+@keyframes bd-glow-pulse {
+  from { opacity: 0.6; }
+  to   { opacity: 1; }
+}
+
+/* Card is dimmed in hand while being dragged */
+.hs-hand-card--dragging {
+  opacity: 0.3 !important;
+  filter : grayscale(0.8) !important;
+  pointer-events: none !important;
+}
+
+/* ─── Game Over particles ─────────────────────────────────── */
+
+.bd-gameover { position: relative; overflow: hidden; }
+
+.bd-gameover-particles { position: absolute; inset: 0; pointer-events: none; }
+
+.bd-particle {
+  position     : absolute;
+  width        : calc(4px + var(--i, 0) * 2px);
+  height       : calc(4px + var(--i, 0) * 2px);
+  border-radius: 50%;
+  background   : hsl(calc(30 + var(--i, 0) * 20), 80%, 65%);
+  left         : calc(10% + var(--i, 0) * 4.5%);
+  bottom       : -20px;
+  animation    : bd-confetti calc(2s + var(--i, 0) * 0.15s) ease-out both;
+  animation-delay: calc(var(--i, 0) * 0.08s);
+}
+
+@keyframes bd-confetti {
+  0%   { transform: translateY(0) rotate(0deg);   opacity: 1; }
+  100% { transform: translateY(-90vh) rotate(720deg); opacity: 0; }
+}
+
+/* ─── Responsive ──────────────────────────────────────────── */
+
+@media (max-width: 680px) {
+  .bd-root {
+    height: calc(100vh - 140px);
+    grid-template-rows: 56px 1fr 28px 1fr auto;
+  }
+
+  .bd-board-slot {
+    width : 100px;
+    height: 120px;
+  }
+
+  .bd-board-row { gap: 8px; min-height: 130px; }
+  .bd-slot-art  { height: 56px; }
+
+  .bd-hp-block { max-width: 130px; }
+
+  .bd-mana-crystals--md .bd-mana-gem { width: 9px; height: 9px; }
+}
