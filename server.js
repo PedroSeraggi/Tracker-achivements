@@ -202,6 +202,100 @@ app.post('/auth/logout', (req, res) => {
   });
 });
 
+
+const _profileCache = new Map();
+
+function _getCached(key) {
+  const entry = _profileCache.get(key);
+  if (!entry) return null;
+  if (Date.now() > entry.expiresAt) { _profileCache.delete(key); return null; }
+  return entry.data;
+}
+function _setCached(key, data, ttlMs) {
+  _profileCache.set(key, { data, expiresAt: Date.now() + ttlMs });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  GET /api/profile/background
+//  Retorna o background de perfil ativo do usuário logado.
+//
+//  Response shape (passado direto do Steam):
+//  {
+//    profile_background: {
+//      communityitemid, image_large, name, item_title,
+//      movie_webm?, movie_mp4?, movie_webm_small?, movie_mp4_small?,
+//      appid, ...
+//    }
+//  }
+// ─────────────────────────────────────────────────────────────────────────────
+app.get('/api/profile/background', requireAuth, async (req, res) => {
+  const steamId = req.user?.steamId || req.session?.passport?.user?.steamId;
+  if (!steamId) return res.status(401).json({ error: 'Not authenticated' });
+
+  const cacheKey = `bg:${steamId}`;
+  const cached = _getCached(cacheKey);
+  if (cached) return res.json(cached);
+
+  try {
+    const url = new URL('https://api.steampowered.com/IPlayerService/GetProfileBackground/v1/');
+    url.searchParams.set('key', process.env.STEAM_API_KEY);
+    url.searchParams.set('steamid', steamId);
+
+    const r = await fetch(url.toString());
+    if (!r.ok) throw new Error(`Steam returned ${r.status}`);
+
+    const data = await r.json();
+    const result = data?.response ?? {};
+    _setCached(cacheKey, result, 5 * 60 * 1000); // 5 min
+    return res.json(result);
+  } catch (err) {
+    console.error('[Profile] background error:', err.message);
+    return res.json({});   // degradação graciosa — sem background
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  GET /api/profile/recent-games
+//  Retorna os jogos jogados recentemente pelo usuário logado.
+//
+//  Response shape:
+//  {
+//    total_count: N,
+//    games: [{ appid, name, playtime_2weeks, playtime_forever, img_icon_url, ... }]
+//  }
+// ─────────────────────────────────────────────────────────────────────────────
+app.get('/api/profile/recent-games', requireAuth, async (req, res) => {
+  const steamId = req.user?.steamId || req.session?.passport?.user?.steamId;
+  if (!steamId) return res.status(401).json({ error: 'Not authenticated' });
+
+  const cacheKey = `recent:${steamId}`;
+  const cached = _getCached(cacheKey);
+  if (cached) return res.json(cached);
+
+  try {
+    const url = new URL('https://api.steampowered.com/IPlayerService/GetRecentlyPlayedGames/v1/');
+    url.searchParams.set('key', process.env.STEAM_API_KEY);
+    url.searchParams.set('steamid', steamId);
+    url.searchParams.set('count', '10');
+
+    const r = await fetch(url.toString());
+    if (!r.ok) throw new Error(`Steam returned ${r.status}`);
+
+    const data = await r.json();
+    const result = data?.response ?? { total_count: 0, games: [] };
+    _setCached(cacheKey, result, 2 * 60 * 1000); // 2 min
+    return res.json(result);
+  } catch (err) {
+    console.error('[Profile] recent-games error:', err.message);
+    return res.json({ total_count: 0, games: [] });
+  }
+});
+
+
+
+
+
+
 // ─── Auth middleware ──────────────────────────────────────────────────────────
 function requireAuth(req, res, next) {
   if (req.isAuthenticated()) return next();

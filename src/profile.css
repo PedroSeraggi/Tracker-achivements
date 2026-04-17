@@ -1,0 +1,1117 @@
+/* =============================================================
+   profile.css
+   Cole no final do seu arquivo CSS global (ou importe em main.tsx).
+   Todos os seletores começam com "profile-" para não conflitar
+   com o resto do projeto.
+   ============================================================= */
+
+/* ─── Rarity Colors (mesmas do trophy-duel.css) ───────────── */
+:root {
+  --rarity-common    : #9ca3af;
+  --rarity-uncommon  : #4ade80;
+  --rarity-rare      : #60a5fa;
+  --rarity-epic      : #c084fc;
+  --rarity-legendary : #fbbf24;
+  --rarity-mythic    : #f472b6;
+}
+
+/* ─── Background animado ──────────────────────────────────── */
+
+.profile-bg-container {
+  position  : fixed;
+  inset     : 0;
+  z-index   : 0;
+  overflow  : hidden;
+  /* Fica atrás de TUDO no #view-profile */
+  pointer-events: none;
+  /* Garante que fique atrás do conteúdo */
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100vw;
+  height: 100vh;
+}
+
+/* Gradiente escuro por cima do vídeo/imagem — garante legibilidade */
+.profile-bg-overlay {
+  position  : absolute;
+  inset     : 0;
+  z-index   : 2;
+  background: linear-gradient(
+    180deg,
+    rgba(8, 15, 24, 0.45) 0%,
+    rgba(8, 15, 24, 0.60) 40%,
+    rgba(8, 15, 24, 0.75) 100%
+  );
+}
+
+/* Vídeo de background */
+.profile-bg-video {
+  position  : absolute;
+  inset     : 0;
+  width     : 100%;
+  height    : 100%;
+  object-fit: cover;
+  z-index   : 1;
+  /* Garante que o vídeo fique ATRÁS do overlay */
+}
+
+/* Imagem estática de background */
+.profile-bg-image {
+  position           : absolute;
+  inset              : 0;
+  width              : 100%;
+  height             : 100%;
+  object-fit         : cover;
+  object-position    : center;
+  z-index            : 1;
+  /* DEBUG: fundo vermelho para ver onde a imagem deveria estar */
+  /* background-color: red !important; */
+  /* Ken Burns sutil */
+  animation          : profile-bg-drift 30s ease-in-out infinite alternate;
+  transform-origin   : center center;
+}
+
+@keyframes profile-bg-drift {
+  from { transform: scale(1.0)  translate(0, 0); }
+  to   { transform: scale(1.06) translate(-1%, -1%); }
+}
+
+.profile-bg-fallback {
+  position  : absolute;
+  inset     : 0;
+  background: radial-gradient(ellipse at 50% 20%, #0d2235 0%, #080f18 100%);
+  z-index   : 1;
+  /* DEBUG: borda vermelha para verificar se o container está visível */
+  /* border: 5px solid red; */
+}
+
+/* Label do background (ex: "Space Beach") */
+.profile-bg-label {
+  position : absolute;
+  bottom   : 12px;
+  right    : 16px;
+  z-index  : 3;
+  font-size: 11px;
+  color    : rgba(255,255,255,0.35);
+  letter-spacing: 0.5px;
+  pointer-events: none;
+}
+
+/* ─── Conteúdo sobre o background ────────────────────────── */
+
+/* O profile-container existente não precisa de mudança,
+   mas adicionamos posicionamento relativo e z-index */
+.profile-content {
+  position : relative;
+  z-index  : 1;
+  padding-bottom: 60px;
+}
+
+/* ─── User Banner ─────────────────────────────────────────── */
+
+.profile-user-banner {
+  display        : flex;
+  align-items    : flex-start;
+  gap            : 20px;
+  flex-wrap      : wrap;
+  position       : relative;
+  /* Glassmorphism fallback */
+  background     : rgba(10, 18, 30, 0.836);
+  backdrop-filter: blur(16px);
+  border         : 1px solid rgba(255,255,255,0.09);
+  border-radius  : 20px;
+  padding        : 28px 28px 24px;
+  margin         : 20px 20px 16px;
+  box-shadow     : 0 8px 32px rgba(0,0,0,0.4);
+  cursor         : pointer;
+  transition     : all 0.3s ease;
+  overflow       : hidden;
+  min-height     : 140px;
+}
+
+/* Background da imagem do jogo (igual ao perfect-game-banner) */
+.profile-user-banner-bg {
+  position     : absolute;
+  inset        : 0;
+  background-size: cover;
+  background-position: center;
+
+  z-index      : 0;
+}
+
+.profile-user-banner:hover {
+  border-color: rgba(255,255,255,0.2);
+  transform   : translateY(-2px);
+}
+
+/* Overlay para legibilidade do texto sobre imagem */
+.profile-user-banner-overlay {
+  position     : absolute;
+  inset        : 0;
+  background   : linear-gradient(135deg, rgba(10,18,30,0.92) 0%, rgba(10,18,30,0.75) 50%, rgba(10,18,30,0.85) 100%);
+  border-radius: 20px;
+  pointer-events: none;
+  z-index      : 1;
+}
+
+/* Botão fechar seleção */
+.profile-banner-close {
+  position     : absolute;
+  top          : 12px;
+  right        : 12px;
+  z-index      : 10;
+  background   : rgba(0,0,0,0.6);
+  border       : 1px solid rgba(255,255,255,0.2);
+  color        : #fff;
+  padding      : 6px 12px;
+  border-radius: 6px;
+  font-size    : 12px;
+  cursor       : pointer;
+  transition   : all 0.2s;
+}
+
+.profile-banner-close:hover {
+  background: rgba(255,255,255,0.1);
+}
+
+/* Indicador de qual jogo está sendo usado */
+.profile-banner-indicator {
+  display      : inline-flex;
+  align-items  : center;
+  gap          : 6px;
+  margin-top   : 8px;
+  padding      : 4px 10px;
+  background   : rgba(0,0,0,0.4);
+  border       : 1px solid rgba(255,255,255,0.15);
+  border-radius: 99px;
+  font-size    : 11px;
+  color        : var(--txt2, #8899aa);
+  cursor       : pointer;
+  transition   : all 0.2s;
+  max-width    : fit-content;
+  position     : relative;
+  z-index      : 3;
+}
+
+.profile-banner-indicator:hover {
+  background   : rgba(255,255,255,0.1);
+  border-color : var(--accent, #3a7acc);
+  color        : #fff;
+}
+
+/* ─── Banner Game Selector ───────────────────────────────── */
+
+.profile-banner-selector {
+  background   : rgba(10, 18, 30, 0.95);
+  border       : 1px solid rgba(255,255,255,0.1);
+  border-radius: 16px;
+  padding      : 20px;
+  margin       : 0 20px 16px;
+  backdrop-filter: blur(10px);
+}
+
+.profile-banner-selector-title {
+  font-size    : 14px;
+  color        : var(--txt1, #e0e6ed);
+  margin       : 0 0 16px 0;
+  font-weight  : 600;
+}
+
+.profile-banner-grid {
+  display      : grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap          : 12px;
+  max-height   : 400px;
+  overflow-y   : auto;
+  padding-right: 8px;
+}
+
+.profile-banner-option {
+  position     : relative;
+  cursor       : pointer;
+  border-radius: 8px;
+  overflow     : hidden;
+  border       : 2px solid transparent;
+  transition   : all 0.2s;
+}
+
+.profile-banner-option:hover {
+  transform : scale(1.02);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+}
+
+.profile-banner-option.selected {
+  border-color: var(--accent, #3a7acc);
+}
+
+.profile-banner-option-img {
+  width     : 100%;
+  height    : 70px; /* Proporção do hero/banner Steam (460x215 ~ 2.14:1) */
+  object-fit: cover;
+  object-position: center;
+  display   : block;
+}
+
+.profile-banner-option-name {
+  position     : absolute;
+  bottom       : 0;
+  left         : 0;
+  right        : 0;
+  padding      : 8px;
+  background   : linear-gradient(to top, rgba(0,0,0,0.9) 0%, transparent 100%);
+  font-size    : 12px;
+  color        : #fff;
+  white-space  : nowrap;
+  overflow     : hidden;
+  text-overflow: ellipsis;
+}
+
+.profile-banner-option-check {
+  position     : absolute;
+  top          : 8px;
+  right        : 8px;
+  width        : 24px;
+  height       : 24px;
+  background   : var(--accent, #3a7acc);
+  border-radius: 50%;
+  display      : flex;
+  align-items  : center;
+  justify-content: center;
+  font-size    : 14px;
+  color        : #fff;
+  box-shadow   : 0 2px 8px rgba(0,0,0,0.4);
+}
+
+.profile-user-identity {
+  display    : flex;
+  gap        : 20px;
+  align-items: center;
+  flex       : 1;
+  min-width  : 0;
+  position   : relative;
+  z-index    : 2;
+}
+
+/* Avatar com halo animado */
+.profile-avatar-wrap {
+  position   : relative;
+  flex-shrink: 0;
+}
+
+.profile-avatar-halo {
+  position     : absolute;
+  inset        : -5px;
+  border-radius: 50%;
+  border       : 2px solid transparent;
+  background   : linear-gradient(135deg, var(--accent, #3a7acc), transparent 60%) border-box;
+  -webkit-mask : linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: destination-out;
+  mask         : linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  animation    : profile-halo-spin 6s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes profile-halo-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+.profile-username {
+  font-size  : 24px;
+  font-weight: 900;
+  color      : #fff;
+  margin     : 0;
+  letter-spacing: -0.3px;
+}
+
+.profile-realname {
+  font-size : 14px;
+  color     : var(--txt2, #8899aa);
+  margin-top: 2px;
+}
+
+.profile-steamid {
+  font-size  : 11px;
+  color      : var(--txt3, #556677);
+  font-family: monospace;
+  margin-top : 4px;
+}
+
+.profile-steam-link {
+  display     : inline-block;
+  margin-top  : 10px;
+  font-size   : 12px;
+  color       : var(--accent, #3a7acc);
+  text-decoration: none;
+  border      : 1px solid rgba(58,122,204,0.4);
+  border-radius: 6px;
+  padding     : 4px 10px;
+  transition  : background 0.2s;
+}
+
+.profile-steam-link:hover {
+  background: rgba(58,122,204,0.15);
+}
+
+/* Level badge */
+.profile-level-badge {
+  background   : rgba(0,0,0,0.45);
+  border       : 1px solid rgba(255,255,255,0.1);
+  border-radius: 14px;
+  padding      : 14px 20px;
+  text-align   : center;
+  min-width    : 140px;
+  cursor       : pointer;
+  transition   : border-color 0.2s, transform 0.15s;
+  backdrop-filter: blur(8px);
+  position     : relative;
+  z-index      : 2;
+}
+
+.profile-level-badge:hover {
+  border-color: var(--accent, #3a7acc);
+  transform   : translateY(-2px);
+}
+
+.profile-level-num {
+  font-size     : 10px;
+  color         : var(--txt3, #556677);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+
+.profile-level-title {
+  font-size  : 17px;
+  font-weight: 900;
+  color      : var(--accent, #3a7acc);
+  margin     : 5px 0 3px;
+}
+
+.profile-level-xp {
+  font-size: 13px;
+  color    : var(--txt2, #8899aa);
+}
+
+.profile-level-bar-wrap {
+  height       : 5px;
+  background   : rgba(255,255,255,0.08);
+  border-radius: 99px;
+  overflow     : hidden;
+  margin       : 8px 0 4px;
+}
+
+.profile-level-bar-fill {
+  height       : 100%;
+  border-radius: 99px;
+  background   : var(--accent, #3a7acc);
+  transition   : width 0.6s ease;
+}
+
+.profile-level-next {
+  font-size: 10px;
+  color    : var(--txt3, #556677);
+}
+
+/* ─── Stats row ───────────────────────────────────────────── */
+
+.profile-stats-row {
+  display              : grid;
+  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+  gap                  : 10px;
+  padding              : 0 20px 16px;
+}
+
+.profile-stat-card {
+  background   : rgba(10, 18, 30, 0.55);
+  backdrop-filter: blur(12px);
+  border       : 1px solid rgba(255,255,255,0.07);
+  border-radius: 12px;
+  padding      : 14px 12px;
+  text-align   : center;
+  transition   : border-color 0.2s, transform 0.15s;
+}
+
+.profile-stat-card:hover {
+  border-color: rgba(255,255,255,0.15);
+  transform   : translateY(-2px);
+}
+
+.profile-stat-icon {
+  font-size    : 18px;
+  margin-bottom: 6px;
+}
+
+.profile-stat-value {
+  font-size  : 20px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.profile-stat-label {
+  font-size  : 10px;
+  color      : var(--txt3, #556677);
+  margin-top : 4px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+/* ─── Sections ────────────────────────────────────────────── */
+
+.profile-section {
+  padding      : 0 20px 32px;
+}
+
+.profile-section-header {
+  display        : flex;
+  justify-content: space-between;
+  align-items    : center;
+  margin-bottom  : 14px;
+}
+
+.profile-section-title {
+  font-size     : 13px;
+  color         : var(--txt2, #8899aa);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  margin        : 0;
+}
+
+.profile-edit-btn {
+  padding      : 6px 12px;
+  font-size    : 12px;
+  font-weight  : 600;
+  background   : transparent;
+  border       : 1px solid var(--accent, #3a7acc);
+  border-radius: 6px;
+  color        : var(--accent, #3a7acc);
+  cursor       : pointer;
+  transition   : all 0.2s;
+}
+
+.profile-edit-btn.active,
+.profile-edit-btn:hover {
+  background: var(--accent, #3a7acc);
+  color     : #fff;
+}
+
+.profile-star-btn {
+  width        : 28px;
+  height       : 28px;
+  border-radius: 14px;
+  border       : 2px solid currentColor;
+  background   : transparent;
+  font-size    : 14px;
+  font-weight  : 700;
+  cursor       : pointer;
+  display      : flex;
+  align-items  : center;
+  justify-content: center;
+}
+
+.profile-featured-row {
+  display    : flex;
+  gap        : 16px;
+  align-items: center;
+  background : rgba(10, 18, 30, 0.55);
+  backdrop-filter: blur(10px);
+  border     : 1px solid rgba(255,255,255,0.07);
+  border-radius: 12px;
+  padding    : 14px 18px;
+  transition : border-color 0.2s, transform 0.15s;
+}
+
+.profile-featured-row:hover {
+  border-color: rgba(255,255,255,0.14);
+  transform   : translateY(-1px);
+}
+
+.profile-pick-row {
+  display    : flex;
+  gap        : 12px;
+  align-items: center;
+  padding    : 8px 12px;
+  border-radius: 8px;
+  cursor     : pointer;
+  border     : 1px solid transparent;
+  background : rgba(255,255,255,0.02);
+  transition : background 0.15s, border-color 0.15s;
+}
+
+.profile-pick-row:hover {
+  background: rgba(255,255,255,0.05);
+}
+
+/* ─── Featured Section (Novo sistema flexível) ─────────────── */
+
+.profile-featured-add {
+  display      : flex;
+  align-items  : center;
+  justify-content: center;
+  gap          : 12px;
+  width        : 100%;
+  padding      : 40px 20px;
+  background   : rgba(255,255,255,0.02);
+  border       : 2px dashed rgba(255,255,255,0.15);
+  border-radius: 16px;
+  color        : var(--txt2, #8899aa);
+  font-size    : 14px;
+  cursor       : pointer;
+  transition   : all 0.2s;
+}
+
+.profile-featured-add:hover {
+  background   : rgba(255,255,255,0.05);
+  border-color : var(--accent, #3a7acc);
+  color        : var(--accent, #3a7acc);
+}
+
+.profile-featured-add-icon {
+  font-size    : 24px;
+  font-weight  : 300;
+}
+
+.profile-featured-type-selector {
+  background   : rgba(10, 18, 30, 0.8);
+  border       : 1px solid rgba(255,255,255,0.1);
+  border-radius: 16px;
+  padding      : 20px;
+}
+
+.profile-featured-type-grid {
+  display      : grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap          : 12px;
+}
+
+@media (max-width: 600px) {
+  .profile-featured-type-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.profile-featured-type-btn {
+  display      : flex;
+  flex-direction: column;
+  align-items  : center;
+  gap          : 8px;
+  padding      : 20px 16px;
+  background   : rgba(255,255,255,0.05);
+  border       : 1px solid rgba(255,255,255,0.1);
+  border-radius: 12px;
+  cursor       : pointer;
+  transition   : all 0.2s;
+  color        : inherit;
+}
+
+.profile-featured-type-btn:hover {
+  background   : rgba(255,255,255,0.1);
+  border-color : var(--accent, #3a7acc);
+  transform    : translateY(-2px);
+}
+
+.profile-featured-type-icon {
+  font-size    : 32px;
+}
+
+.profile-featured-type-label {
+  font-size    : 14px;
+  font-weight  : 700;
+  color        : #fff;
+}
+
+.profile-featured-type-desc {
+  font-size    : 11px;
+  color        : var(--txt2, #8899aa);
+  text-align   : center;
+}
+
+.profile-featured-cancel {
+  display      : block;
+  margin       : 16px auto 0;
+  padding      : 8px 20px;
+  background   : transparent;
+  border       : 1px solid rgba(255,255,255,0.2);
+  border-radius: 8px;
+  color        : var(--txt2, #8899aa);
+  font-size    : 12px;
+  cursor       : pointer;
+  transition   : all 0.2s;
+}
+
+.profile-featured-cancel:hover {
+  border-color : rgba(255,255,255,0.4);
+  color        : #fff;
+}
+
+.profile-featured-empty {
+  text-align   : center;
+  padding      : 40px 20px;
+  color        : var(--txt2, #8899aa);
+  font-size    : 13px;
+}
+
+.profile-featured-clear {
+  display      : block;
+  margin       : 16px auto 0;
+  padding      : 10px 20px;
+  background   : rgba(255,0,0,0.1);
+  border       : 1px solid rgba(255,0,0,0.3);
+  border-radius: 8px;
+  color        : #ff6b6b;
+  font-size    : 12px;
+  cursor       : pointer;
+  transition   : all 0.2s;
+}
+
+.profile-featured-clear:hover {
+  background   : rgba(255,0,0,0.2);
+}
+
+/* ─── Featured Achievements ────────────────────────────────── */
+
+.profile-featured-achievements {
+  display      : grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap          : 12px;
+}
+
+.profile-featured-achievement {
+  display      : flex;
+  align-items  : center;
+  gap          : 12px;
+  padding      : 12px 16px;
+  background   : rgba(10, 18, 30, 0.55);
+  backdrop-filter: blur(10px);
+  border       : 1px solid rgba(255,255,255,0.07);
+  border-radius: 12px;
+  cursor       : pointer;
+  transition   : all 0.2s;
+}
+
+.profile-featured-achievement:hover {
+  border-color : rgba(255,255,255,0.14);
+  transform    : translateY(-1px);
+}
+
+.profile-featured-ach-icon {
+  width        : 48px;
+  height       : 48px;
+  border-radius: 8px;
+  flex-shrink  : 0;
+}
+
+.profile-featured-ach-info {
+  flex         : 1;
+  min-width    : 0;
+}
+
+.profile-featured-ach-name {
+  font-size    : 13px;
+  font-weight  : 600;
+  color        : #fff;
+  white-space  : nowrap;
+  overflow     : hidden;
+  text-overflow: ellipsis;
+}
+
+.profile-featured-ach-game {
+  font-size    : 11px;
+  color        : var(--txt2, #8899aa);
+  margin-top   : 2px;
+}
+
+.profile-featured-ach-rarity {
+  font-size    : 11px;
+  color        : var(--accent, #3a7acc);
+  margin-top   : 2px;
+}
+
+/* ─── Featured Cards (Mesmo design das cartas de duelo) ───── */
+
+:root {
+  --profile-card-width : 180px;
+  --profile-card-height: 260px;
+  --profile-card-radius: 14px;
+}
+
+.profile-featured-cards {
+  display              : grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--profile-card-width), 1fr));
+  gap                  : 16px;
+}
+
+/* Card container */
+.profile-featured-card {
+  position   : relative;
+  width      : 100%;
+  max-width  : var(--profile-card-width);
+  height     : var(--profile-card-height);
+  margin     : 0 auto;
+  perspective: 800px;
+}
+
+.profile-featured-card-inner {
+  position       : relative;
+  width          : 100%;
+  height         : 100%;
+  border-radius  : var(--profile-card-radius);
+  overflow       : hidden;
+  background     : var(--bg2, #1a2332);
+  border         : 2px solid transparent;
+  display        : flex;
+  flex-direction : column;
+  transition     : transform 0.15s ease, box-shadow 0.25s ease;
+  transform-style: preserve-3d;
+}
+
+/* Rarity borders + glows - mesmo esquema do duelo */
+.profile-featured-card[data-rarity="common"]    .profile-featured-card-inner { border-color: var(--rarity-common);    box-shadow: 0 4px 14px rgba(156,163,175,0.25); }
+.profile-featured-card[data-rarity="uncommon"]  .profile-featured-card-inner { border-color: var(--rarity-uncommon);  box-shadow: 0 4px 14px rgba(74,222,128,0.25);  }
+.profile-featured-card[data-rarity="rare"]      .profile-featured-card-inner { border-color: var(--rarity-rare);      box-shadow: 0 4px 18px rgba(96,165,250,0.35);  }
+.profile-featured-card[data-rarity="epic"]      .profile-featured-card-inner { border-color: var(--rarity-epic);      box-shadow: 0 4px 20px rgba(192,132,252,0.4);  }
+.profile-featured-card[data-rarity="legendary"] .profile-featured-card-inner { border-color: var(--rarity-legendary); box-shadow: 0 6px 28px rgba(251,191,36,0.5);   }
+.profile-featured-card[data-rarity="mythic"]    .profile-featured-card-inner { border-color: var(--rarity-mythic);    box-shadow: 0 8px 32px rgba(244,114,182,0.55); }
+
+/* Hover glow amplification */
+.profile-featured-card[data-rarity="legendary"]:hover .profile-featured-card-inner { box-shadow: 0 12px 44px rgba(251,191,36,0.7);    }
+.profile-featured-card[data-rarity="mythic"]:hover    .profile-featured-card-inner { box-shadow: 0 14px 52px rgba(244,114,182,0.75); }
+
+/* Card Art Area */
+.profile-featured-card-art {
+  position: relative;
+  flex    : 0 0 110px;
+  overflow: hidden;
+}
+
+.profile-featured-card-art-bg {
+  position           : absolute;
+  inset              : 0;
+  background-size    : cover;
+  background-position: center;
+  filter             : blur(8px) brightness(0.4);
+  transform          : scale(1.1);
+}
+
+.profile-featured-card-icon {
+  position     : absolute;
+  top          : 50%;
+  left         : 50%;
+  transform    : translate(-50%, -50%);
+  width        : 64px;
+  height       : 64px;
+  border-radius: 10px;
+  object-fit   : contain;
+  filter       : drop-shadow(0 4px 12px rgba(0,0,0,0.6));
+  z-index      : 1;
+}
+
+/* Rarity badge */
+.profile-featured-card-rarity-badge {
+  position      : absolute;
+  top           : 8px;
+  left          : 8px;
+  z-index       : 2;
+  background    : rgba(0,0,0,0.72);
+  border-radius : 4px;
+  padding       : 3px 8px;
+  font-size     : 9px;
+  font-weight   : 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
+
+.profile-featured-card[data-rarity="common"]    .profile-featured-card-rarity-badge { color: var(--rarity-common);    border: 1px solid var(--rarity-common);    }
+.profile-featured-card[data-rarity="uncommon"]  .profile-featured-card-rarity-badge { color: var(--rarity-uncommon);  border: 1px solid var(--rarity-uncommon);  }
+.profile-featured-card[data-rarity="rare"]      .profile-featured-card-rarity-badge { color: var(--rarity-rare);      border: 1px solid var(--rarity-rare);      }
+.profile-featured-card[data-rarity="epic"]      .profile-featured-card-rarity-badge { color: var(--rarity-epic);      border: 1px solid var(--rarity-epic);      }
+.profile-featured-card[data-rarity="legendary"] .profile-featured-card-rarity-badge { color: var(--rarity-legendary); border: 1px solid var(--rarity-legendary); }
+.profile-featured-card[data-rarity="mythic"]    .profile-featured-card-rarity-badge { color: var(--rarity-mythic);    border: 1px solid var(--rarity-mythic);    }
+
+/* Shine sweep on Legendary/Mythic */
+.profile-featured-card[data-rarity="legendary"] .profile-featured-card-art::after,
+.profile-featured-card[data-rarity="mythic"]    .profile-featured-card-art::after {
+  content        : '';
+  position       : absolute;
+  inset          : 0;
+  background     : linear-gradient(115deg, transparent 30%, rgba(255,255,255,0.08) 50%, transparent 70%);
+  background-size: 200% 100%;
+  animation      : card-shine 3s linear infinite;
+  pointer-events : none;
+  z-index        : 3;
+}
+
+@keyframes card-shine {
+  0%   { background-position:  200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Card Body */
+.profile-featured-card-body {
+  flex          : 1;
+  padding       : 10px 12px;
+  display       : flex;
+  flex-direction: column;
+  gap           : 4px;
+  background    : linear-gradient(180deg, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0) 100%);
+}
+
+.profile-featured-card-name {
+  font-size         : 11.5px;
+  font-weight       : 700;
+  color             : #fff;
+  line-height       : 1.3;
+  display           : -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp        : 2;
+  -webkit-box-orient: vertical;
+  overflow          : hidden;
+}
+
+.profile-featured-card-game {
+  font-size    : 10px;
+  color        : var(--txt3, #556677);
+  white-space  : nowrap;
+  overflow     : hidden;
+  text-overflow: ellipsis;
+  margin-top   : 2px;
+}
+
+/* Card Footer */
+.profile-featured-card-footer {
+  padding        : 8px 12px 10px;
+  display        : flex;
+  align-items    : center;
+  justify-content: space-between;
+  border-top     : 1px solid rgba(255,255,255,0.06);
+  margin-top     : auto;
+}
+
+.profile-featured-card-damage-block {
+  display    : flex;
+  align-items: center;
+  gap        : 5px;
+}
+
+.profile-featured-card-damage-icon { font-size: 12px; }
+
+.profile-featured-card-damage-value {
+  font-size     : 18px;
+  font-weight   : 900;
+  line-height   : 1;
+  letter-spacing: -0.5px;
+}
+
+/* Damage colors by rarity - mesmo esquema do duelo */
+.profile-featured-card[data-rarity="common"]    .profile-featured-card-damage-value { color: var(--rarity-common);    }
+.profile-featured-card[data-rarity="uncommon"]  .profile-featured-card-damage-value { color: var(--rarity-uncommon);  }
+.profile-featured-card[data-rarity="rare"]      .profile-featured-card-damage-value { color: var(--rarity-rare);      }
+.profile-featured-card[data-rarity="epic"]      .profile-featured-card-damage-value { color: var(--rarity-epic);      }
+.profile-featured-card[data-rarity="legendary"] .profile-featured-card-damage-value { color: var(--rarity-legendary); }
+.profile-featured-card[data-rarity="mythic"]    .profile-featured-card-damage-value { color: var(--rarity-mythic);    }
+
+/* Remove button */
+.profile-featured-card .profile-star-btn {
+  position     : absolute;
+  top          : 8px;
+  right        : 8px;
+  z-index      : 10;
+  width        : 28px;
+  height       : 28px;
+  border-radius: 14px;
+  border       : 2px solid rgba(255,255,255,0.3);
+  background   : rgba(0,0,0,0.6);
+  color        : #fff;
+  font-size    : 14px;
+  font-weight  : 700;
+  cursor       : pointer;
+  display      : flex;
+  align-items  : center;
+  justify-content: center;
+  transition   : all 0.2s;
+}
+
+.profile-featured-card .profile-star-btn:hover {
+  background: rgba(255,0,0,0.8);
+  border-color: rgba(255,0,0,0.8);
+  transform   : scale(1.1);
+}
+
+/* ─── Recently Played ─────────────────────────────────────── */
+
+.profile-loading-row {
+  display: flex;
+  gap    : 10px;
+  overflow-x: auto;
+}
+
+.profile-recent-skeleton {
+  width        : 200px;
+  height       : 110px;
+  border-radius: 10px;
+  background   : linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.04) 75%);
+  background-size: 200% 100%;
+  animation   : profile-skeleton 1.5s ease-in-out infinite;
+  flex-shrink  : 0;
+}
+
+@keyframes profile-skeleton {
+  from { background-position:  200% 0; }
+  to   { background-position: -200% 0; }
+}
+
+/* Carrossel infinito */
+.profile-recent-carousel {
+  overflow: hidden;
+  width: 100%;
+  position: relative;
+  /* Máscara de fade nas bordas - cards sumem suavemente */
+  mask-image: linear-gradient(
+    to right,
+    transparent 0%,
+    black 5%,
+    black 95%,
+    transparent 100%
+  );
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent 0%,
+    black 5%,
+    black 95%,
+    transparent 100%
+  );
+}
+
+.profile-recent-track {
+  display: flex;
+  gap: 10px;
+  animation: profile-scroll 30s linear infinite;
+  width: max-content;
+}
+
+/* Pausa animação no hover para permitir interação */
+.profile-recent-carousel:hover .profile-recent-track {
+  animation-play-state: paused;
+}
+
+@keyframes profile-scroll {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.profile-recent-card {
+  flex-shrink  : 0;
+  width        : 200px;
+  border-radius: 10px;
+  overflow     : hidden;
+  background   : rgba(10, 18, 30, 0.6);
+  backdrop-filter: blur(10px);
+  border       : 1px solid rgba(255,255,255,0.07);
+  transition   : border-color 0.2s, transform 0.15s;
+}
+
+.profile-recent-card:hover {
+  border-color: rgba(255,255,255,0.16);
+  transform   : translateY(-3px);
+}
+
+/* Header image thumbnail */
+.profile-recent-art {
+  position: relative;
+  height  : 68px;
+  overflow: hidden;
+}
+
+.profile-recent-art img {
+  width     : 100%;
+  height    : 100%;
+  object-fit: cover;
+  display   : block;
+}
+
+.profile-recent-art-overlay {
+  position  : absolute;
+  inset     : 0;
+  background: linear-gradient(180deg, transparent 40%, rgba(8,15,24,0.8) 100%);
+}
+
+.profile-recent-info {
+  padding: 8px 10px 10px;
+}
+
+.profile-recent-name {
+  font-size  : 12px;
+  font-weight: 700;
+  color      : #fff;
+  white-space: nowrap;
+  overflow   : hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 5px;
+}
+
+.profile-recent-times {
+  display    : flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.profile-recent-this-week {
+  font-size : 11px;
+  color     : var(--accent, #3a7acc);
+  font-weight: 600;
+}
+
+.profile-recent-total {
+  font-size: 10px;
+  color    : var(--txt3, #556677);
+}
+
+/* Barra de tempo relativo */
+.profile-recent-bar-wrap {
+  height       : 3px;
+  background   : rgba(255,255,255,0.07);
+  border-radius: 99px;
+  overflow     : hidden;
+}
+
+.profile-recent-bar-fill {
+  height       : 100%;
+  border-radius: 99px;
+  background   : var(--accent, #3a7acc);
+  transition   : width 0.5s ease;
+  min-width    : 6px;
+}
+
+/* ─── Responsive ──────────────────────────────────────────── */
+
+@media (max-width: 600px) {
+  .profile-user-banner {
+    padding: 18px 16px 16px;
+    margin : 12px 12px 12px;
+  }
+
+  .profile-stats-row {
+    padding: 0 12px 12px;
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .profile-section {
+    padding: 0 12px 24px;
+  }
+
+  .profile-username {
+    font-size: 18px;
+  }
+
+  .profile-level-badge {
+    min-width: 110px;
+    padding  : 10px 14px;
+  }
+}

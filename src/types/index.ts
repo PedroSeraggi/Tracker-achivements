@@ -130,3 +130,34 @@ export interface ProfileStats {
   title: string;
   featuredGames: Game[];
 }
+
+// ── Featured Items (Profile Showcase) ─────────────────────────────────────────
+export type FeaturedType = 'games' | 'achievements' | 'cards';
+
+export interface FeaturedAchievement {
+  gameAppId: number;
+  apiName: string;
+}
+
+export interface FeaturedCard {
+  // TrophyCard reference - stored as achievement reference
+  gameAppId: number;
+  apiName: string;
+  // cached display data
+  name?: string;
+  iconUrl?: string;
+  damage?: number;
+  rarity?: 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary' | 'mythic';
+}
+
+export interface FeaturedSection {
+  id: string;
+  type: FeaturedType;
+  title: string;
+  // For games: array of appIds
+  gameIds?: number[];
+  // For achievements: array of achievement references
+  achievements?: FeaturedAchievement[];
+  // For cards: array of card data
+  cards?: FeaturedCard[];
+}

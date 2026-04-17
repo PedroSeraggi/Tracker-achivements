@@ -295,6 +295,30 @@
   .detail-banner-stats { font-size: 12px; color: var(--txt2); margin-top: 4px; }
   .detail-banner-pct   { text-align: right; flex-shrink: 0; }
   .detail-pct    { font-size: 40px; font-weight: 900; color: var(--accent); line-height: 1; }
+  .detail-pct-perfect {
+    color: #daf9fc !important;
+    text-shadow: 0 0 20px rgba(255, 255, 255, 0.8),
+                 0 0 40px rgba(179, 212, 218, 0.836),
+                 0 0 60px rgba(168, 166, 153, 0.3)3);
+    animation: perfect-glow 2s ease-in-out infinite alternate;
+  }
+  @keyframes perfect-glow {
+    from { text-shadow: 0 0 20px rgba(37, 203, 233, 0.8), 0 0 40px rgba(255, 215, 0, 0.5); }
+    to   { text-shadow: 0 0 30px rgb(4, 109, 247), 0 0 60px rgba(255, 215, 0, 0.8), 0 0 90px rgba(255, 215, 0, 0.5); }
+  }
+  .detail-perfect-shine {
+    font-size: 14px;
+    font-weight: 700;
+    color: #00c3ff;
+    text-align: center;
+    letter-spacing: 2px;
+    text-shadow: 0 0 15px rgba(255, 215, 0, 0.8);
+    animation: perfect-shine 1.5s ease-in-out infinite;
+  }
+  @keyframes perfect-shine {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.8; transform: scale(1.02); }
+  }
   .detail-achcount { font-size: 12px; color: var(--txt2); margin-top: 4px; }
   .detail-banner-bottom { margin-top: 16px; }
   .detail-trophy-row    { width: 100%; }

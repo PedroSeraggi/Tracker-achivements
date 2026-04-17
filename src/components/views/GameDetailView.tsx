@@ -99,14 +99,18 @@ const GameDetailView: React.FC = () => {
               </div>
             </div>
             <div className="detail-banner-pct">
-              <div className="detail-pct" style={{ color: barColor }}>
+              <div className={`detail-pct${game.percentage === 100 ? ' detail-pct-perfect' : ''}`} style={{ color: barColor }}>
                 {game.percentage}%
               </div>
               <div className="detail-achcount">{game.unlockedCount} / {game.totalCount}</div>
             </div>
           </div>
           <div className="detail-banner-bottom">
-            <ProgressBar percent={game.percentage} color={barColor} height={6} />
+            {game.percentage < 100 ? (
+              <ProgressBar percent={game.percentage} color={barColor} height={6} />
+            ) : (
+              <div className="detail-perfect-shine"></div>
+            )}
           </div>
         </div>
       </div>

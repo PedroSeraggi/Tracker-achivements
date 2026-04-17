@@ -6,7 +6,7 @@ import { fetchGames, logoutRequest, clearGamesCache } from '../../api/steamApi';
 const TABS = [
   { id: 'grid',     label: 'Todos os Jogos' },
   { id: 'overview', label: 'Visão Geral' },
-  { id: 'profile',  label: '🏆 Perfil Gamer' },
+  { id: 'profile',  label: '🏆 Perfil' },
   { id: 'guides',   label: '📖 Guias' },
   { id: 'search',   label: '🔍 Buscar Jogadores' },
   { id: 'duel',   label: '⚔️ Duelo' },

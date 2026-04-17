@@ -15,6 +15,10 @@ import type {
   LoadingState,
   Toast,
   ToastKind,
+  FeaturedSection,
+  FeaturedType,
+  FeaturedAchievement,
+  FeaturedCard,
 } from '../types';
 import type { SavedDeck, TrophyCard } from '../types/duel';
 
@@ -27,8 +31,9 @@ interface AppState {
   // ── Games / Data
   games: Game[];
   loading: LoadingState;
-  featuredGameIds: number[]; // games featured in profile
   perfectGameIds: number[]; // platinum games showcased in profile
+  profileBannerGameId: number | null; // game banner displayed on profile
+  featuredSections: FeaturedSection[]; // multiple showcase sections (max 3 of each type)
 
   // ── Dashboard navigation
   dashView: DashView;
@@ -79,14 +84,22 @@ interface AppState {
   setLoading: (l: Partial<LoadingState>) => void;
   addLoadingGame: (name: string) => void;
 
-  // Featured games actions
-  addFeaturedGame: (appId: number) => void;
-  removeFeaturedGame: (appId: number) => void;
-  setFeaturedGameIds: (ids: number[]) => void;
+  // Featured sections actions (multiple)
+  addFeaturedSection: (type: FeaturedType, title: string) => string; // returns id
+  removeFeaturedSection: (id: string) => void;
+  updateFeaturedSectionTitle: (id: string, title: string) => void;
+  addFeaturedGameToSection: (sectionId: string, appId: number) => void;
+  removeFeaturedGameFromSection: (sectionId: string, appId: number) => void;
+  addFeaturedAchievementToSection: (sectionId: string, gameAppId: number, apiName: string) => void;
+  removeFeaturedAchievementFromSection: (sectionId: string, gameAppId: number, apiName: string) => void;
+  addFeaturedCardToSection: (sectionId: string, card: FeaturedCard) => void;
+  removeFeaturedCardFromSection: (sectionId: string, gameAppId: number, apiName: string) => void;
+  clearFeaturedSections: () => void;
   // Perfect games actions
   addPerfectGame: (appId: number) => void;
   removePerfectGame: (appId: number) => void;
   setPerfectGameIds: (ids: number[]) => void;
+  setProfileBannerGame: (appId: number | null) => void;
 
   setDashView: (v: DashView) => void;
   openGameDetail: (appId: number) => void;
@@ -156,8 +169,9 @@ export const useAppStore = create<AppState>()(
         currentUser: null,
         games: [],
         loading: { status: 'Iniciando...', progress: 0, loadedGames: [] },
-        featuredGameIds: [],
         perfectGameIds: [],
+        profileBannerGameId: null,
+        featuredSections: [],
         dashView: 'grid',
         activeGameAppId: null,
         gameFilter: 'all',
@@ -210,18 +224,80 @@ export const useAppStore = create<AppState>()(
             },
           })),
 
-        // ── Featured games
-        addFeaturedGame: (appId) =>
+        // ── Featured sections (multiple)
+        addFeaturedSection: (type, title) => {
+          const id = `featured-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+          const section: FeaturedSection = { id, type, title, gameIds: [], achievements: [], cards: [] };
           set((s) => ({
-            featuredGameIds: s.featuredGameIds.includes(appId)
-              ? s.featuredGameIds
-              : [...s.featuredGameIds, appId].slice(0, 6),
-          })),
-        removeFeaturedGame: (appId) =>
+            featuredSections: [...s.featuredSections, section].slice(0, 9), // max 9 total
+          }));
+          return id;
+        },
+        removeFeaturedSection: (id) =>
           set((s) => ({
-            featuredGameIds: s.featuredGameIds.filter((id) => id !== appId),
+            featuredSections: s.featuredSections.filter((sec) => sec.id !== id),
           })),
-        setFeaturedGameIds: (ids) => set({ featuredGameIds: ids.slice(0, 6) }),
+        updateFeaturedSectionTitle: (id, title) =>
+          set((s) => ({
+            featuredSections: s.featuredSections.map((sec) =>
+              sec.id === id ? { ...sec, title } : sec
+            ),
+          })),
+        addFeaturedGameToSection: (sectionId, appId) =>
+          set((s) => ({
+            featuredSections: s.featuredSections.map((sec) => {
+              if (sec.id !== sectionId || sec.type !== 'games') return sec;
+              const gameIds = sec.gameIds || [];
+              if (gameIds.includes(appId)) return sec;
+              return { ...sec, gameIds: [...gameIds, appId].slice(0, 6) };
+            }),
+          })),
+        removeFeaturedGameFromSection: (sectionId, appId) =>
+          set((s) => ({
+            featuredSections: s.featuredSections.map((sec) => {
+              if (sec.id !== sectionId || sec.type !== 'games') return sec;
+              const gameIds = sec.gameIds || [];
+              return { ...sec, gameIds: gameIds.filter((id) => id !== appId) };
+            }),
+          })),
+        addFeaturedAchievementToSection: (sectionId, gameAppId, apiName) =>
+          set((s) => ({
+            featuredSections: s.featuredSections.map((sec) => {
+              if (sec.id !== sectionId || sec.type !== 'achievements') return sec;
+              const achievements = sec.achievements || [];
+              const exists = achievements.some((a) => a.gameAppId === gameAppId && a.apiName === apiName);
+              if (exists) return sec;
+              const achievement: FeaturedAchievement = { gameAppId, apiName };
+              return { ...sec, achievements: [...achievements, achievement].slice(0, 6) };
+            }),
+          })),
+        removeFeaturedAchievementFromSection: (sectionId, gameAppId, apiName) =>
+          set((s) => ({
+            featuredSections: s.featuredSections.map((sec) => {
+              if (sec.id !== sectionId || sec.type !== 'achievements') return sec;
+              const achievements = sec.achievements || [];
+              return { ...sec, achievements: achievements.filter((a) => !(a.gameAppId === gameAppId && a.apiName === apiName)) };
+            }),
+          })),
+        addFeaturedCardToSection: (sectionId, card) =>
+          set((s) => ({
+            featuredSections: s.featuredSections.map((sec) => {
+              if (sec.id !== sectionId || sec.type !== 'cards') return sec;
+              const cards = sec.cards || [];
+              const exists = cards.some((c) => c.gameAppId === card.gameAppId && c.apiName === card.apiName);
+              if (exists) return sec;
+              return { ...sec, cards: [...cards, card].slice(0, 6) };
+            }),
+          })),
+        removeFeaturedCardFromSection: (sectionId, gameAppId, apiName) =>
+          set((s) => ({
+            featuredSections: s.featuredSections.map((sec) => {
+              if (sec.id !== sectionId || sec.type !== 'cards') return sec;
+              const cards = sec.cards || [];
+              return { ...sec, cards: cards.filter((c) => !(c.gameAppId === gameAppId && c.apiName === apiName)) };
+            }),
+          })),
+        clearFeaturedSections: () => set({ featuredSections: [] }),
 
         // ── Perfect games
         addPerfectGame: (appId) =>
@@ -235,6 +311,7 @@ export const useAppStore = create<AppState>()(
             perfectGameIds: s.perfectGameIds.filter((id) => id !== appId),
           })),
         setPerfectGameIds: (ids) => set({ perfectGameIds: ids.slice(0, 6) }),
+        setProfileBannerGame: (appId) => set({ profileBannerGameId: appId }),
 
         // ── Dashboard
         setDashView: (dashView) =>
@@ -378,7 +455,7 @@ export const useAppStore = create<AppState>()(
       {
         name: 'steam-tracker-storage',
         // Only persist guides, featured/perfect games, and saved decks locally; auth/games come from server
-        partialize: (s) => ({ guides: s.guides, featuredGameIds: s.featuredGameIds, perfectGameIds: s.perfectGameIds, savedDecks: s.savedDecks }),
+        partialize: (s) => ({ guides: s.guides, featuredSections: s.featuredSections, perfectGameIds: s.perfectGameIds, savedDecks: s.savedDecks }),
       }
     )
   )
