@@ -7,6 +7,7 @@ import './profile.css';
 import './trophy-duel.css';
 import './player-profile.css';
 import './battle-board.css';
+import './leaderboard.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

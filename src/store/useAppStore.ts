@@ -19,6 +19,8 @@ import type {
   FeaturedType,
   FeaturedAchievement,
   FeaturedCard,
+  LeaderboardEntry,
+  LeaderboardStatus,
 } from '../types';
 import type { SavedDeck, TrophyCard } from '../types/duel';
 
@@ -148,6 +150,16 @@ interface AppState {
   // Search loading
   setSearchLoading: (v: boolean) => void;
 
+  // Leaderboard
+  leaderboard        : LeaderboardEntry[];
+  leaderboardStatus  : LeaderboardStatus;
+  leaderboardSearch  : string;
+  leaderboardError   : string | null;
+  setLeaderboard      : (entries: LeaderboardEntry[]) => void;
+  setLeaderboardStatus: (s: LeaderboardStatus) => void;
+  setLeaderboardSearch: (q: string) => void;
+  setLeaderboardError : (e: string | null) => void;
+
   // Saved deck actions
   saveDeck: (name: string, cards: TrophyCard[], gameIds: number[]) => void;
   deleteDeck: (id: string) => void;
@@ -196,6 +208,10 @@ export const useAppStore = create<AppState>()(
         libraryOpen: false,
         toasts: [],
         searchLoading: false,
+        leaderboard: [],
+        leaderboardStatus: 'idle',
+        leaderboardSearch: '',
+        leaderboardError: null,
 
         // ── Auth
         setScreen: (screen) => set({ screen }),
@@ -210,6 +226,9 @@ export const useAppStore = create<AppState>()(
             gameFilter: 'all',
             searchedPlayer: null,
             searchView: 'home',
+            leaderboard: [],
+            leaderboardStatus: 'idle',
+            leaderboardSearch: '',
           }),
 
         // ── Games
@@ -451,6 +470,12 @@ export const useAppStore = create<AppState>()(
 
         // ── Search loading
         setSearchLoading: (searchLoading) => set({ searchLoading }),
+
+        // ── Leaderboard
+        setLeaderboard: (leaderboard) => set({ leaderboard }),
+        setLeaderboardStatus: (leaderboardStatus) => set({ leaderboardStatus }),
+        setLeaderboardSearch: (leaderboardSearch) => set({ leaderboardSearch }),
+        setLeaderboardError: (leaderboardError) => set({ leaderboardError }),
       }),
       {
         name: 'steam-tracker-storage',

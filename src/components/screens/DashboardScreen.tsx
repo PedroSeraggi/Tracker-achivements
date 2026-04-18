@@ -9,6 +9,7 @@ import GuidesView from '../views/GuidesView';
 import SearchView from '../views/SearchView';
 import GameDetailView from '../views/GameDetailView';
 import TrophyDuelView from '../views/TrophyDuelView';
+import LeaderboardView from '../views/LeaderboardView';
 
 const DashboardScreen: React.FC = () => {
   const dashView        = useAppStore((s) => s.dashView);
@@ -28,7 +29,8 @@ const DashboardScreen: React.FC = () => {
             {dashView === 'profile'  && <ProfileView />}
             {dashView === 'guides'   && <GuidesView />}
             {dashView === 'search'   && <SearchView />}
-            {dashView === 'duel'   && <TrophyDuelView />}
+            {dashView === 'duel'     && <TrophyDuelView />}
+            {dashView === 'leaderboard' && <LeaderboardView />}
           </>
         )}
       </main>

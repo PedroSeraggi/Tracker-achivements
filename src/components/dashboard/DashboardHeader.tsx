@@ -9,7 +9,8 @@ const TABS = [
   { id: 'profile',  label: '🏆 Perfil' },
   { id: 'guides',   label: '📖 Guias' },
   { id: 'search',   label: '🔍 Buscar Jogadores' },
-  { id: 'duel',   label: '⚔️ Duelo' },
+  { id: 'duel',     label: '⚔️ Duelo' },
+  { id: 'leaderboard', label: '🏆 Leaderboard' },
 ] as const;
 
 const DashboardHeader: React.FC = () => {

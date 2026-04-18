@@ -1,0 +1,735 @@
+/* =============================================================
+   leaderboard.css
+   Import em main.tsx:  import './styles/leaderboard.css';
+   Prefixo: "lb-"
+   ============================================================= */
+
+/* ══════════════════════════════════════════════════════════════
+   ROOT & LAYOUT
+   ══════════════════════════════════════════════════════════════ */
+
+.lb-root {
+  display       : flex;
+  flex-direction: column;
+  gap           : 0;
+  padding       : 20px 20px 48px;
+  max-width     : 900px;
+  margin        : 0 auto;
+  animation     : lb-page-enter 0.36s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes lb-page-enter {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0);    }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   HEADER
+   ══════════════════════════════════════════════════════════════ */
+
+.lb-header {
+  display        : flex;
+  align-items    : flex-start;
+  justify-content: space-between;
+  gap            : 16px;
+  margin-bottom  : 12px;
+  flex-wrap      : wrap;
+}
+
+.lb-title {
+  font-size    : 22px;
+  font-weight  : 900;
+  color        : #fff;
+  margin       : 0 0 4px;
+  line-height  : 1;
+}
+
+.lb-subtitle {
+  font-size : 13px;
+  color     : var(--txt2, #8899aa);
+  margin    : 0;
+  line-height: 1.5;
+}
+
+.lb-my-rank { color: var(--txt1, #c8d6e5); }
+
+.lb-refresh-btn {
+  display      : flex;
+  align-items  : center;
+  gap          : 6px;
+  padding      : 8px 16px;
+  background   : rgba(255,255,255,0.05);
+  border       : 1px solid rgba(255,255,255,0.1);
+  border-radius: 8px;
+  color        : var(--txt2, #8899aa);
+  font-size    : 13px;
+  font-weight  : 600;
+  cursor       : pointer;
+  flex-shrink  : 0;
+  transition   : background 0.2s, color 0.2s, transform 0.15s;
+  white-space  : nowrap;
+}
+
+.lb-refresh-btn:hover:not(:disabled) {
+  background: rgba(58,122,204,0.15);
+  color     : #60a5fa;
+  transform : scale(1.02);
+}
+
+.lb-refresh-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+@keyframes lb-spin {
+  to { transform: rotate(360deg); }
+}
+
+.lb-spin {
+  display: inline-block;
+  animation: lb-spin 0.8s linear infinite;
+}
+
+/* ── Sync hint ───────────────────────────────────────────────── */
+.lb-sync-hint {
+  display      : flex;
+  align-items  : flex-start;
+  gap          : 8px;
+  padding      : 9px 14px;
+  background   : rgba(251,191,36,0.07);
+  border       : 1px solid rgba(251,191,36,0.18);
+  border-radius: 8px;
+  font-size    : 12px;
+  color        : rgba(251,191,36,0.8);
+  margin-bottom: 16px;
+  line-height  : 1.5;
+}
+
+/* ── Search bar ──────────────────────────────────────────────── */
+.lb-search-wrap {
+  position      : relative;
+  display       : flex;
+  align-items   : center;
+  margin-bottom : 24px;
+}
+
+.lb-search-icon {
+  position    : absolute;
+  left        : 12px;
+  font-size   : 14px;
+  pointer-events: none;
+}
+
+.lb-search-input {
+  width        : 100%;
+  padding      : 10px 40px 10px 38px;
+  background   : rgba(255,255,255,0.04);
+  border       : 1px solid rgba(255,255,255,0.1);
+  border-radius: 10px;
+  color        : #fff;
+  font-size    : 14px;
+  outline      : none;
+  transition   : border-color 0.2s, box-shadow 0.2s;
+}
+
+.lb-search-input::placeholder { color: var(--txt3, #556677); }
+
+.lb-search-input:focus {
+  border-color: rgba(58,122,204,0.6);
+  box-shadow  : 0 0 0 3px rgba(58,122,204,0.12);
+}
+
+.lb-search-clear {
+  position    : absolute;
+  right       : 10px;
+  background  : none;
+  border      : none;
+  color       : var(--txt3, #556677);
+  font-size   : 12px;
+  cursor      : pointer;
+  padding     : 4px;
+  border-radius: 4px;
+  transition  : color 0.2s;
+}
+.lb-search-clear:hover { color: #fff; }
+
+/* ── Error ───────────────────────────────────────────────────── */
+.lb-error {
+  display      : flex;
+  align-items  : center;
+  gap          : 10px;
+  padding      : 12px 16px;
+  background   : rgba(248,113,113,0.08);
+  border       : 1px solid rgba(248,113,113,0.2);
+  border-radius: 8px;
+  font-size    : 13px;
+  color        : #f87171;
+  margin-bottom: 16px;
+  flex-wrap    : wrap;
+}
+
+.lb-error-retry {
+  margin-left  : auto;
+  padding      : 5px 14px;
+  background   : rgba(248,113,113,0.15);
+  border       : 1px solid rgba(248,113,113,0.3);
+  border-radius: 6px;
+  color        : #f87171;
+  font-size    : 12px;
+  cursor       : pointer;
+  transition   : background 0.2s;
+}
+.lb-error-retry:hover { background: rgba(248,113,113,0.25); }
+
+/* ══════════════════════════════════════════════════════════════
+   PODIUM (TOP 3)
+   ══════════════════════════════════════════════════════════════ */
+
+.lb-podium {
+  display              : grid;
+  grid-template-columns: 1fr 1.15fr 1fr;
+  gap                  : 10px;
+  align-items          : flex-end;
+  margin-bottom        : 28px;
+}
+
+/* ── Podium card ─────────────────────────────────────────────── */
+.lb-podium-card {
+  position      : relative;
+  display       : flex;
+  flex-direction: column;
+  align-items   : center;
+  padding       : 20px 16px 18px;
+  border-radius : 16px;
+  cursor        : pointer;
+  border        : 1px solid rgba(255,255,255,0.06);
+  background    : rgba(255,255,255,0.03);
+  overflow      : hidden;
+  transition    : transform 0.2s ease, box-shadow 0.2s ease;
+  animation     : lb-podium-rise 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+  user-select   : none;
+}
+
+.lb-podium-card--1 { animation-delay: 0.05s; }
+.lb-podium-card--2 { animation-delay: 0.12s; }
+.lb-podium-card--3 { animation-delay: 0.18s; }
+
+@keyframes lb-podium-rise {
+  from { opacity: 0; transform: translateY(20px) scale(0.96); }
+  to   { opacity: 1; transform: translateY(0)    scale(1);    }
+}
+
+.lb-podium-card:hover {
+  transform : translateY(-4px);
+  box-shadow: 0 16px 40px var(--medal-shadow, rgba(0,0,0,0.3));
+}
+
+/* Gold card — bigger + glowing */
+.lb-podium-card--1 {
+  background: linear-gradient(
+    160deg,
+    rgba(245,158,11,0.1)  0%,
+    rgba(245,158,11,0.04) 60%,
+    rgba(10,18,32,0.6)    100%
+  );
+  border-color : rgba(245,158,11,0.3);
+  padding-top  : 28px;
+  padding-bottom: 22px;
+}
+
+.lb-podium-card--2 {
+  background: linear-gradient(
+    160deg,
+    rgba(148,163,184,0.08) 0%,
+    rgba(10,18,32,0.6)     100%
+  );
+  border-color: rgba(148,163,184,0.25);
+}
+
+.lb-podium-card--3 {
+  background: linear-gradient(
+    160deg,
+    rgba(205,127,50,0.08) 0%,
+    rgba(10,18,32,0.6)    100%
+  );
+  border-color: rgba(205,127,50,0.22);
+}
+
+/* Me highlight */
+.lb-podium-card--me {
+  border-color: rgba(58,122,204,0.5) !important;
+  box-shadow  : 0 0 0 2px rgba(58,122,204,0.2) !important;
+}
+
+/* Animated glow ring behind card */
+.lb-podium-glow-ring {
+  position      : absolute;
+  inset         : -2px;
+  border-radius : 18px;
+  border        : 2px solid var(--medal-color, transparent);
+  opacity       : 0;
+  pointer-events: none;
+  animation     : lb-glow-pulse 2.5s ease-in-out infinite;
+}
+
+.lb-podium-card--1 .lb-podium-glow-ring {
+  opacity: 1;
+}
+
+@keyframes lb-glow-pulse {
+  0%, 100% { opacity: 0.2; box-shadow: 0 0 0   0   var(--medal-glow, transparent); }
+  50%       { opacity: 0.7; box-shadow: 0 0 18px 4px var(--medal-glow, transparent); }
+}
+
+/* Medal emoji */
+.lb-podium-medal {
+  font-size    : 28px;
+  margin-bottom: 8px;
+  filter       : drop-shadow(0 2px 6px var(--medal-glow, rgba(0,0,0,0.3)));
+  animation    : lb-medal-float 3s ease-in-out infinite;
+}
+
+.lb-podium-card--1 .lb-podium-medal { font-size: 36px; }
+
+@keyframes lb-medal-float {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(-4px); }
+}
+
+/* Rank */
+.lb-podium-rank {
+  font-size    : 11px;
+  font-weight  : 700;
+  color        : var(--medal-color, var(--txt3));
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 10px;
+}
+
+/* Avatar wrap */
+.lb-podium-avatar-wrap {
+  position     : relative;
+  margin-bottom: 10px;
+  border-radius: 50%;
+  box-shadow   : 0 0 0 3px var(--medal-color, transparent),
+                 0 0 16px var(--medal-glow, transparent);
+  transition   : box-shadow 0.2s;
+}
+
+.lb-podium-avatar-wrap--first {
+  box-shadow:
+    0 0 0 3px var(--medal-color, transparent),
+    0 0 24px var(--medal-glow, transparent),
+    0 0 40px var(--medal-glow, transparent);
+}
+
+/* Name */
+.lb-podium-name {
+  font-size    : 14px;
+  font-weight  : 700;
+  color        : #fff;
+  text-align   : center;
+  margin-bottom: 10px;
+  max-width    : 100%;
+  white-space  : nowrap;
+  overflow     : hidden;
+  text-overflow: ellipsis;
+}
+
+.lb-podium-card--1 .lb-podium-name { font-size: 16px; }
+
+/* Primary stat */
+.lb-podium-stat-main {
+  display        : flex;
+  flex-direction : column;
+  align-items    : center;
+  margin-bottom  : 8px;
+}
+
+.lb-podium-stat-val {
+  font-size  : 22px;
+  font-weight: 900;
+  color      : var(--medal-color, #fff);
+  line-height: 1;
+}
+
+.lb-podium-card--1 .lb-podium-stat-val { font-size: 28px; }
+
+.lb-podium-stat-label {
+  font-size     : 9px;
+  color         : var(--txt3, #556677);
+  text-transform: uppercase;
+  letter-spacing: 0.7px;
+  margin-top    : 3px;
+}
+
+.lb-podium-stat-main--unregistered .lb-podium-stat-val {
+  color: var(--txt2, #8899aa);
+}
+
+/* Secondary badges */
+.lb-podium-secondary {
+  display : flex;
+  gap     : 5px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-bottom: 6px;
+}
+
+.lb-podium-badge {
+  font-size    : 10px;
+  font-weight  : 700;
+  padding      : 2px 8px;
+  border-radius: 99px;
+  white-space  : nowrap;
+}
+
+.lb-podium-badge--plat {
+  background: rgba(245,158,11,0.1);
+  border    : 1px solid rgba(245,158,11,0.25);
+  color     : #f59e0b;
+}
+
+.lb-podium-badge--rare {
+  background: rgba(168,85,247,0.1);
+  border    : 1px solid rgba(168,85,247,0.25);
+  color     : #c084fc;
+}
+
+/* Sync */
+.lb-podium-sync {
+  font-size: 9px;
+  color    : var(--txt3, #556677);
+  margin-top: 2px;
+}
+
+/* ── Me badge ─────────────────────────────────────────────────── */
+.lb-me-badge {
+  position     : absolute;
+  bottom       : -2px;
+  right        : -2px;
+  background   : #3b82f6;
+  color        : #fff;
+  font-size    : 8px;
+  font-weight  : 900;
+  padding      : 2px 5px;
+  border-radius: 99px;
+  letter-spacing: 0.5px;
+  white-space  : nowrap;
+}
+
+.lb-me-badge--sm {
+  position: absolute;
+  bottom  : -4px;
+  right   : -4px;
+  font-size: 8px;
+  padding  : 1px 4px;
+}
+
+/* ── Private badge ───────────────────────────────────────────── */
+.lb-private-badge {
+  position  : absolute;
+  top       : -2px;
+  right     : -2px;
+  font-size : 11px;
+  background: rgba(0,0,0,0.6);
+  border-radius: 50%;
+  width     : 18px;
+  height    : 18px;
+  display   : flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ── Skeleton card ───────────────────────────────────────────── */
+.lb-skeleton-card {
+  padding : 24px 16px;
+  pointer-events: none;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   LIST (RANK 4+)
+   ══════════════════════════════════════════════════════════════ */
+
+/* ── List header ─────────────────────────────────────────────── */
+.lb-list-header {
+  display              : grid;
+  grid-template-columns: 44px 1fr 80px 80px 100px 24px;
+  align-items          : center;
+  padding              : 0 12px 8px;
+  font-size            : 10px;
+  font-weight          : 700;
+  color                : var(--txt3, #556677);
+  text-transform       : uppercase;
+  letter-spacing       : 0.8px;
+  border-bottom        : 1px solid rgba(255,255,255,0.06);
+  margin-bottom        : 4px;
+}
+
+.lb-lh-rank   { text-align: center; }
+.lb-lh-player { padding-left: 48px; }
+.lb-lh-stat   { text-align: center; }
+.lb-lh-total  { text-align: right;  padding-right: 28px; }
+
+/* ── List ────────────────────────────────────────────────────── */
+.lb-list {
+  display       : flex;
+  flex-direction: column;
+  gap           : 2px;
+  margin-bottom : 20px;
+}
+
+/* ── Row ─────────────────────────────────────────────────────── */
+.lb-row {
+  display              : grid;
+  grid-template-columns: 44px 40px 1fr 80px 80px 100px 24px;
+  align-items          : center;
+  gap                  : 0;
+  padding              : 9px 12px;
+  border-radius        : 10px;
+  border               : 1px solid transparent;
+  cursor               : pointer;
+  transition           : background 0.15s, border-color 0.15s, transform 0.15s;
+  animation            : lb-row-enter 0.3s var(--row-delay, 0s) cubic-bezier(0.22, 1, 0.36, 1) both;
+  will-change          : transform;
+}
+
+/* Stagger animation for list rows */
+.lb-list .lb-row:nth-child(1)  { --row-delay: 0.03s; }
+.lb-list .lb-row:nth-child(2)  { --row-delay: 0.06s; }
+.lb-list .lb-row:nth-child(3)  { --row-delay: 0.09s; }
+.lb-list .lb-row:nth-child(4)  { --row-delay: 0.12s; }
+.lb-list .lb-row:nth-child(5)  { --row-delay: 0.15s; }
+.lb-list .lb-row:nth-child(6)  { --row-delay: 0.18s; }
+.lb-list .lb-row:nth-child(n+7){ --row-delay: 0.2s;  }
+
+@keyframes lb-row-enter {
+  from { opacity: 0; transform: translateX(-8px); }
+  to   { opacity: 1; transform: translateX(0);    }
+}
+
+.lb-row:hover {
+  background  : rgba(255,255,255,0.04);
+  border-color: rgba(255,255,255,0.07);
+  transform   : translateX(3px);
+}
+
+/* Current user row */
+.lb-row--me {
+  background  : rgba(58,122,204,0.07) !important;
+  border-color: rgba(58,122,204,0.2)  !important;
+}
+
+.lb-row--me:hover {
+  background  : rgba(58,122,204,0.12) !important;
+  border-color: rgba(58,122,204,0.3)  !important;
+}
+
+/* Rank number */
+.lb-row-rank { text-align: center; }
+
+.lb-row-rank-num {
+  font-size  : 13px;
+  font-weight: 700;
+  color      : var(--txt3, #556677);
+}
+
+/* Avatar wrap */
+.lb-row-avatar-wrap {
+  position : relative;
+  width    : 40px;
+  margin   : 0 10px;
+  flex-shrink: 0;
+}
+
+/* Info */
+.lb-row-info {
+  flex    : 1;
+  min-width: 0;
+  padding  : 0 8px;
+}
+
+.lb-row-name {
+  font-size    : 14px;
+  font-weight  : 600;
+  color        : #e2e8f0;
+  white-space  : nowrap;
+  overflow     : hidden;
+  text-overflow: ellipsis;
+  display      : flex;
+  align-items  : center;
+  gap          : 5px;
+}
+
+.lb-private-tag { font-size: 11px; }
+
+.lb-row-sub {
+  font-size: 11px;
+  color    : var(--txt3, #556677);
+  margin-top: 2px;
+}
+
+.lb-row-sync {
+  opacity: 0.65;
+}
+
+/* Stat cells */
+.lb-row-stat {
+  display        : flex;
+  align-items    : center;
+  justify-content: center;
+  gap            : 4px;
+  font-size      : 12px;
+}
+
+.lb-row-stat-icon { font-size: 12px; }
+
+.lb-row-stat-val {
+  font-weight: 600;
+  color      : var(--txt2, #8899aa);
+}
+
+.lb-row-stat-empty {
+  color: var(--txt3, #556677);
+}
+
+/* Total achievements (rightmost, most prominent) */
+.lb-row-stat--total {
+  justify-content: flex-end;
+  padding-right  : 8px;
+}
+
+.lb-row-total-val {
+  font-size  : 15px;
+  font-weight: 900;
+  color      : #fff;
+}
+
+.lb-row-unregistered {
+  font-size  : 10px;
+  color      : var(--txt3, #556677);
+  white-space: nowrap;
+}
+
+/* Chevron */
+.lb-row-chevron {
+  font-size  : 18px;
+  color      : var(--txt3, #556677);
+  text-align : center;
+  transition : transform 0.15s, color 0.15s;
+}
+
+.lb-row:hover .lb-row-chevron {
+  transform: translateX(2px);
+  color    : var(--txt2, #8899aa);
+}
+
+/* ── Skeleton rows ───────────────────────────────────────────── */
+.lb-skeleton-row {
+  pointer-events : none;
+  cursor         : default;
+  animation      : none !important;
+  transform      : none !important;
+  border         : none !important;
+  background     : transparent !important;
+  margin-bottom  : 2px;
+}
+
+.lb-skeleton {
+  background   : linear-gradient(
+    90deg,
+    rgba(255,255,255,0.04) 25%,
+    rgba(255,255,255,0.08) 50%,
+    rgba(255,255,255,0.04) 75%
+  );
+  background-size: 200% 100%;
+  animation    : lb-skeleton-wave 1.6s linear infinite;
+  border-radius: 6px;
+}
+
+@keyframes lb-skeleton-wave {
+  from { background-position:  200% 0; }
+  to   { background-position: -200% 0; }
+}
+
+.lb-skeleton-rank   { width: 28px; height: 16px; margin: 0 auto; }
+.lb-skeleton-avatar { width: 40px; height: 40px; border-radius: 50%; margin: 0 10px; }
+.lb-skeleton-avatar-lg { width: 72px; height: 72px; border-radius: 50%; margin: 0 auto 12px; }
+.lb-skeleton-info   { flex: 1; padding: 0 8px; display: flex; flex-direction: column; gap: 5px; }
+.lb-skeleton-name   { height: 14px; width: 70%; }
+.lb-skeleton-sub    { height: 11px; width: 45%; }
+.lb-skeleton-name-lg { height: 14px; width: 80%; border-radius: 4px; }
+.lb-skeleton-stat   { width: 48px; height: 14px; margin: 0 16px; }
+
+/* ── Footer ──────────────────────────────────────────────────── */
+.lb-footer {
+  text-align    : center;
+  font-size     : 11px;
+  color         : var(--txt3, #556677);
+  padding-top   : 12px;
+  border-top    : 1px solid rgba(255,255,255,0.05);
+  letter-spacing: 0.3px;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   RESPONSIVE
+   ══════════════════════════════════════════════════════════════ */
+
+@media (max-width: 760px) {
+  .lb-root { padding: 14px 12px 40px; }
+
+  /* Podium: stack vertically on very small screens */
+  .lb-podium {
+    grid-template-columns: 1fr;
+    gap                  : 8px;
+    align-items          : stretch;
+  }
+
+  /* Re-order: 1st on top on mobile */
+  .lb-podium-card--1 { order: 0; }
+  .lb-podium-card--2 { order: 1; }
+  .lb-podium-card--3 { order: 2; }
+
+  .lb-podium-card {
+    flex-direction: row;
+    align-items   : center;
+    padding       : 14px 16px;
+    gap           : 14px;
+    text-align    : left;
+  }
+
+  .lb-podium-medal   { font-size: 28px !important; margin: 0; order: -1; }
+  .lb-podium-rank    { display: none; }
+  .lb-podium-avatar-wrap { margin: 0; flex-shrink: 0; }
+  .lb-podium-name    { margin: 0; font-size: 14px !important; }
+  .lb-podium-stat-main { margin: 0; align-items: flex-start; }
+  .lb-podium-secondary { justify-content: flex-start; margin: 0; }
+  .lb-podium-sync    { display: none; }
+
+  /* List: hide rare column */
+  .lb-list-header {
+    grid-template-columns: 36px 1fr 70px 88px 20px;
+  }
+
+  .lb-lh-stat:nth-child(3) { display: none; }
+
+  .lb-row {
+    grid-template-columns: 36px 36px 1fr 70px 88px 20px;
+  }
+
+  .lb-row-stat--rare { display: none; }
+  .lb-row-rank-num   { font-size: 12px; }
+}
+
+@media (max-width: 480px) {
+  /* Hide plat column too — only show name + total */
+  .lb-list-header {
+    grid-template-columns: 32px 1fr 80px 20px;
+  }
+
+  .lb-lh-stat { display: none; }
+
+  .lb-row {
+    grid-template-columns: 32px 34px 1fr 80px 20px;
+  }
+
+  .lb-row-stat--plat { display: none; }
+  .lb-row-stat--rare { display: none; }
+}

@@ -50,7 +50,16 @@ export type GameSort =
   | 'recent';
 
 // ── Views ─────────────────────────────────────────────────────────────────────
-export type DashView = 'grid' | 'overview' | 'profile' | 'guides' | 'search' | 'duel';
+export type DashView = 'grid' | 'overview' | 'profile' | 'guides' | 'search' | 'duel' | 'leaderboard';
+export const TABS = [
+  { id: 'grid',     label: 'Todos os Jogos' },
+  { id: 'overview', label: 'Visão Geral' },
+  { id: 'profile',  label: '🏆 Perfil' },
+  { id: 'guides',   label: '📖 Guias' },
+  { id: 'search',   label: '🔍 Buscar Jogadores' },
+  { id: 'duel',     label: '⚔️ Duelo' },
+  { id: 'leaderboard', label: '🏆 Leaderboard' },
+] as const;
 export type Screen = 'login' | 'loading' | 'dashboard';
 
 // ── Guides ────────────────────────────────────────────────────────────────────
@@ -161,3 +170,6 @@ export interface FeaturedSection {
   // For cards: array of card data
   cards?: FeaturedCard[];
 }
+
+// ── Leaderboard ───────────────────────────────────────────────────────────────
+export * from './leaderboard';

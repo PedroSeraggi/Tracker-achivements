@@ -195,3 +195,33 @@ export async function fetchPlayerBackground(steamId: string): Promise<ProfileBac
 export function generateGuideId(): string {
   return `guide-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 }
+
+// ─── Leaderboard ─────────────────────────────────────────────────────────────
+import type { LeaderboardEntry } from '../types';
+
+export async function fetchLeaderboard(): Promise<LeaderboardEntry[]> {
+  const res = await fetch('/api/leaderboard', { credentials: 'include' });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+export async function invalidateLeaderboardCache(): Promise<void> {
+  await fetch('/api/leaderboard/cache', {
+    method     : 'DELETE',
+    credentials: 'include',
+  });
+}
+
+export async function registerLeaderboardStats(stats: {
+  totalAch : number;
+  platCount: number;
+  rareCount: number;
+  gameCount: number;
+}): Promise<void> {
+  await fetch('/api/leaderboard/register', {
+    method     : 'POST',
+    credentials: 'include',
+    headers    : { 'Content-Type': 'application/json' },
+    body       : JSON.stringify(stats),
+  });
+}
