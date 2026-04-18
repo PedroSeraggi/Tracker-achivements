@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import {
   fetchMe,
@@ -62,6 +62,9 @@ export function usePlayerSearch() {
   const setSearchLoading     = useAppStore((s) => s.setSearchLoading);
   const addToast             = useAppStore((s) => s.addToast);
 
+  // Progress state for loading games
+  const [loadingProgress, setLoadingProgress] = useState({ status: '', progress: 0, loaded: 0, total: 0 });
+
   const search = useCallback(
     async (query: string) => {
       setSearchError('');
@@ -84,8 +87,28 @@ export function usePlayerSearch() {
     async (steamId: string) => {
       setSearchView('profile');
       setSearchLoading(true);
+      setLoadingProgress({ status: 'Buscando jogos...', progress: 0, loaded: 0, total: 0 });
+      
       try {
-        const games = await fetchGames(steamId);
+        let totalGames = 0;
+        const games = await fetchGames(
+          steamId,
+          (name, progress) => {
+            // Estimate total from progress percentage
+            if (progress > 0 && totalGames === 0) {
+              totalGames = Math.round(100 / progress * (progress / 100));
+            }
+            setLoadingProgress({
+              status: `Carregando: ${name}`,
+              progress,
+              loaded: Math.round(progress / 100 * totalGames) || 0,
+              total: totalGames || 100
+            });
+          },
+          true // forceRefresh
+        );
+        
+        setLoadingProgress({ status: 'Concluído!', progress: 100, loaded: games.length, total: games.length });
         setSearchPlayerGames(games);
         addToast('info', `${games.length} jogo${games.length !== 1 ? 's' : ''} carregado${games.length !== 1 ? 's' : ''}.`);
       } catch {
@@ -94,12 +117,13 @@ export function usePlayerSearch() {
         setSearchView('home');
       } finally {
         setSearchLoading(false);
+        setTimeout(() => setLoadingProgress({ status: '', progress: 0, loaded: 0, total: 0 }), 1000);
       }
     },
     [setSearchPlayerGames, setSearchError, setSearchView, setSearchLoading, addToast]
   );
 
-  return { search, loadPlayerGames };
+  return { search, loadPlayerGames, loadingProgress };
 }
 
 // ── Achievement refresh (individual game) ─────────────────────────────────────

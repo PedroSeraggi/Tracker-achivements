@@ -4,7 +4,7 @@ import React, { useMemo, useCallback, useState, useEffect } from 'react';
 import { useAppStore, selectFilteredSearchGames } from '../../store/useAppStore';
 import { Avatar, FilterBar, Empty, ProgressBar } from '../ui';
 import GameCard from '../dashboard/GameCard';
-import { fetchPlayerBackground } from '../../api/steamApi';
+import { fetchPlayerBackground, syncPlayerToLeaderboard } from '../../api/steamApi';
 import { bgImageUrl, bgVideoUrl, type ProfileBackground } from '../../hooks/useProfileData';
 import type { Game, GameFilter, Achievement } from '../../types';
 
@@ -520,6 +520,7 @@ const PlayerProfilePage: React.FC = () => {
   const [background, setBackground] = useState<ProfileBackground | null>(null);
   const [videoFailed, setVideoFailed] = useState(false);
 
+
   // ── Fetch background ─────────────────────────────────────────────────────
   useEffect(() => {
     if (!searchedPlayer?.user?.steamId) return;
@@ -560,6 +561,35 @@ const PlayerProfilePage: React.FC = () => {
   if (!searchedPlayer) return null;
   const { user, games } = searchedPlayer;
   console.log('[PlayerProfile] Total games:', games?.length, 'gamesLoaded:', searchedPlayer.gamesLoaded);
+
+  // ── Sync state ─────────────────────────────────────────────────────────────
+  const [syncing, setSyncing] = useState(false);
+  const [synced, setSynced] = useState(false);
+
+  const handleSyncToLeaderboard = useCallback(async () => {
+    if (!user || games.length === 0 || syncing) return;
+    setSyncing(true);
+    try {
+      const totalAch = games.reduce((s, g) => s + g.unlockedCount, 0);
+      const platCount = games.filter(g => g.trophyTier === 'platinum').length;
+      const rareCount = games.reduce((sum, g) =>
+        sum + g.achievements.filter(a => a.achieved && (a.globalPercent ?? 101) <= 5).length, 0);
+      await syncPlayerToLeaderboard(user.steamId, {
+        totalAch,
+        platCount,
+        rareCount,
+        gameCount: games.length,
+        personaName: user.personaName,
+        avatarUrl: user.avatarUrl,
+        profileUrl: user.profileUrl,
+      });
+      setSynced(true);
+    } catch {
+      // Silently fail
+    } finally {
+      setSyncing(false);
+    }
+  }, [user, games, syncing]);
 
   // ── Computed stats ────────────────────────────────────────────────────────
   const totalUnlocked = games.reduce((s, g) => s + g.unlockedCount, 0);
@@ -702,6 +732,28 @@ const PlayerProfilePage: React.FC = () => {
               >
                 Ver no Steam ↗
               </a>
+              <button
+                onClick={handleSyncToLeaderboard}
+                disabled={syncing || synced || games.length === 0}
+                style={{
+                  marginTop: 8,
+                  padding: '6px 14px',
+                  background: synced ? 'rgba(34,197,94,0.15)' : 'rgba(58,122,204,0.15)',
+                  border: `1px solid ${synced ? 'rgba(34,197,94,0.3)' : 'rgba(58,122,204,0.3)'}`,
+                  borderRadius: 6,
+                  color: synced ? '#22c55e' : '#60a5fa',
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: syncing || synced ? 'default' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  opacity: syncing || synced ? 0.8 : 1,
+                }}
+              >
+                {syncing ? '⏳' : synced ? '✓' : '🏆'} {' '}
+                {syncing ? 'Sincronizando...' : synced ? 'Sincronizado!' : 'Sincronizar no Leaderboard'}
+              </button>
             </div>
           </div>
 

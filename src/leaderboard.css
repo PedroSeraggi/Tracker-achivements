@@ -733,3 +733,165 @@
   .lb-row-stat--plat { display: none; }
   .lb-row-stat--rare { display: none; }
 }
+/* =============================================================
+   leaderboard-v2-patch.css
+   Cole no FINAL do leaderboard.css existente.
+   Adiciona: tabs, paginação, e ajuste na grid para 6 colunas.
+   ============================================================= */
+
+/* ── Tabs ───────────────────────────────────────────────────── */
+
+.lb-tabs {
+  display      : flex;
+  align-items  : center;
+  gap          : 4px;
+  margin-bottom: 16px;
+  background   : rgba(255,255,255,0.03);
+  border       : 1px solid rgba(255,255,255,0.07);
+  border-radius: 10px;
+  padding      : 4px;
+  width        : fit-content;
+}
+
+.lb-tab {
+  display      : flex;
+  align-items  : center;
+  gap          : 6px;
+  padding      : 8px 18px;
+  border-radius: 7px;
+  border       : none;
+  background   : transparent;
+  color        : var(--txt2, #8899aa);
+  font-size    : 13px;
+  font-weight  : 600;
+  cursor       : pointer;
+  transition   : background 0.18s, color 0.18s;
+  white-space  : nowrap;
+}
+
+.lb-tab:hover { color: #fff; background: rgba(255,255,255,0.05); }
+
+.lb-tab--active {
+  background: rgba(58,122,204,0.18);
+  color     : #60a5fa;
+  box-shadow: 0 0 0 1px rgba(58,122,204,0.3);
+}
+
+.lb-tab-count {
+  font-size    : 10px;
+  font-weight  : 700;
+  padding      : 1px 6px;
+  border-radius: 99px;
+  background   : rgba(255,255,255,0.08);
+  color        : var(--txt3, #556677);
+}
+
+.lb-tab--active .lb-tab-count {
+  background: rgba(58,122,204,0.2);
+  color     : #60a5fa;
+}
+
+/* ── List header & rows: 7-column grid (adds rare col) ──────── */
+
+.lb-list-header {
+  grid-template-columns: 44px 1fr 80px 80px 100px 24px !important;
+}
+
+.lb-row {
+  grid-template-columns: 44px 40px 1fr 80px 80px 100px 24px !important;
+}
+
+/* ── Pagination ─────────────────────────────────────────────── */
+
+.lb-pagination {
+  display        : flex;
+  align-items    : center;
+  justify-content: center;
+  gap            : 4px;
+  padding        : 20px 0 8px;
+  flex-wrap      : wrap;
+}
+
+.lb-page-btn {
+  min-width    : 34px;
+  height       : 34px;
+  border-radius: 7px;
+  border       : 1px solid rgba(255,255,255,0.08);
+  background   : rgba(255,255,255,0.03);
+  color        : var(--txt2, #8899aa);
+  font-size    : 13px;
+  font-weight  : 600;
+  cursor       : pointer;
+  transition   : background 0.15s, color 0.15s, border-color 0.15s;
+  display      : flex;
+  align-items  : center;
+  justify-content: center;
+  padding      : 0 8px;
+}
+
+.lb-page-btn:hover:not(:disabled) {
+  background  : rgba(58,122,204,0.15);
+  border-color: rgba(58,122,204,0.35);
+  color       : #60a5fa;
+}
+
+.lb-page-btn--active {
+  background  : rgba(58,122,204,0.25) !important;
+  border-color: rgba(58,122,204,0.55) !important;
+  color       : #60a5fa !important;
+  font-weight : 900 !important;
+}
+
+.lb-page-btn:disabled {
+  opacity: 0.3;
+  cursor : not-allowed;
+}
+
+.lb-page-ellipsis {
+  color    : var(--txt3, #556677);
+  padding  : 0 4px;
+  font-size: 13px;
+  user-select: none;
+}
+
+.lb-page-total {
+  font-size   : 11px;
+  color       : var(--txt3, #556677);
+  margin-left : 8px;
+  white-space : nowrap;
+}
+
+/* ── Responsive updates ─────────────────────────────────────── */
+
+@media (max-width: 760px) {
+  .lb-tabs      { width: 100%; }
+  .lb-tab       { flex: 1; justify-content: center; padding: 8px 12px; }
+
+  .lb-list-header {
+    grid-template-columns: 36px 1fr 70px 88px 20px !important;
+  }
+  .lb-list-header .lb-lh-stat:nth-child(3) { display: none; }
+
+  .lb-row {
+    grid-template-columns: 36px 36px 1fr 70px 88px 20px !important;
+  }
+  .lb-row-stat--rare { display: none; }
+
+  .lb-pagination { gap: 3px; }
+  .lb-page-btn   { min-width: 30px; height: 30px; font-size: 12px; }
+}
+
+@media (max-width: 480px) {
+  .lb-list-header {
+    grid-template-columns: 32px 1fr 80px 20px !important;
+  }
+  .lb-list-header .lb-lh-stat { display: none; }
+
+  .lb-row {
+    grid-template-columns: 32px 34px 1fr 80px 20px !important;
+  }
+  .lb-row-stat--plat { display: none; }
+  .lb-row-stat--rare { display: none; }
+
+  .lb-page-total { display: none; }
+}

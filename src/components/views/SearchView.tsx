@@ -39,7 +39,7 @@ const SearchHome: React.FC = () => {
   const openSearchGameDetail = useAppStore((s) => s.openSearchGameDetail);
   const setSearchView        = useAppStore((s) => s.setSearchView);
 
-  const { search, loadPlayerGames } = usePlayerSearch();
+  const { search, loadPlayerGames, loadingProgress } = usePlayerSearch();
   const filteredGames = useAppStore(selectFilteredSearchGames);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -120,13 +120,39 @@ const SearchHome: React.FC = () => {
 
             {/* CTA: load or open profile */}
             {!searchedPlayer.gamesLoaded ? (
-              <button
-                className="btn-load-games"
-                onClick={() => loadPlayerGames(searchedPlayer.user.steamId)}
-                disabled={searchLoading}
-              >
-                {searchLoading ? '⏳ Carregando...' : '🎮 Carregar Perfil'}
-              </button>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, minWidth: 180 }}>
+                <button
+                  className="btn-load-games"
+                  onClick={() => loadPlayerGames(searchedPlayer.user.steamId)}
+                  disabled={searchLoading}
+                >
+                  {searchLoading ? '⏳ Carregando...' : '🎮 Carregar Perfil'}
+                </button>
+                {searchLoading && loadingProgress.progress > 0 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <div style={{ fontSize: 11, color: 'var(--txt2)' }}>
+                      {loadingProgress.status}
+                    </div>
+                    <div style={{
+                      height: 4,
+                      background: 'rgba(255,255,255,0.1)',
+                      borderRadius: 2,
+                      overflow: 'hidden'
+                    }}>
+                      <div style={{
+                        height: '100%',
+                        width: `${loadingProgress.progress}%`,
+                        background: 'linear-gradient(90deg, #3b82f6, #60a5fa)',
+                        borderRadius: 2,
+                        transition: 'width 0.3s ease'
+                      }} />
+                    </div>
+                    <div style={{ fontSize: 10, color: 'var(--txt3)', textAlign: 'right' }}>
+                      {loadingProgress.loaded}/{loadingProgress.total}
+                    </div>
+                  </div>
+                )}
+              </div>
             ) : (
               <button
                 className="btn-load-games"

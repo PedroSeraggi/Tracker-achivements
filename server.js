@@ -23,6 +23,7 @@ const session   = require('express-session');
 const passport  = require('passport');
 const Steam     = require('passport-steam').Strategy;
 const path      = require('path');
+const db        = require('./db');
 
 // ─── Config ──────────────────────────────────────────────────────────────────
 const API_KEY     = process.env.STEAM_API_KEY;
@@ -153,6 +154,14 @@ passport.use(new Steam(
   async (_identifier, profile, done) => {
     try {
       const user = await getPlayerSummary(profile.id);
+      // ── Mantém perfil fresco no SQLite ──
+      db.updateProfile({
+        steamId    : user.steamId,
+        personaName: user.personaName,
+        avatarUrl  : user.avatarUrl,
+        profileUrl : user.profileUrl,
+        isPrivate  : user.communityVisibilityState < 3,
+      });
       done(null, user);
     } catch (err) {
       done(err);
@@ -385,8 +394,14 @@ app.get('/api/player/:steamId/summary', requireAuth, async (req, res) => {
 
 // Biblioteca completa de outro jogador (para LibraryModal)
 app.get('/api/player/:steamId/library', requireAuth, async (req, res) => {
+  const { steamId } = req.params;
+  const cacheKey = `library:${steamId}`;
+  const cached = _getCached(cacheKey);
+  if (cached) return res.json(cached);
+
   try {
-    const games = await getOwnedGames(req.params.steamId);
+    const games = await getOwnedGames(steamId);
+    _setCached(cacheKey, games, 5 * 60 * 1000); // 5 min cache
     res.json(games);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -395,8 +410,14 @@ app.get('/api/player/:steamId/library', requireAuth, async (req, res) => {
 
 // Jogos de outro jogador (com has_community_visible_stats)
 app.get('/api/player/:steamId/games', requireAuth, async (req, res) => {
+  const { steamId } = req.params;
+  const cacheKey = `games:${steamId}`;
+  const cached = _getCached(cacheKey);
+  if (cached) return res.json(cached);
+
   try {
-    const games = await getOwnedGames(req.params.steamId);
+    const games = await getOwnedGames(steamId);
+    _setCached(cacheKey, games, 5 * 60 * 1000); // 5 min cache
     res.json(games);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -411,181 +432,6 @@ app.get('/api/player/:steamId/games/:appId/achievements', requireAuth, async (re
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
-});
-'use strict';
-
-// ─── In-memory store de stats registrados ────────────────────────────────────
-// Persiste enquanto o servidor está rodando.
-// Para persistência entre restarts, salve em disco (JSON) ou use Redis.
-const _registeredStats = new Map();
-// Formato: steamId → { steamId, totalAch, platCount, gameCount, registeredAt }
-
-// ─── Helper: busca stats leves de um jogador ─────────────────────────────────
-// Retorna apenas gameCount (barato — 1 chamada à API).
-// totalAch só está disponível se o jogador já tiver se registrado.
-async function getLightStats(steamId) {
-  const cacheKey = `lightstats:${steamId}`;
-  const cached   = _getCached(cacheKey);
-  if (cached) return cached;
-
-  try {
-    const data = await steamGet('/IPlayerService/GetOwnedGames/v1/', {
-      steamid:                   steamId,
-      include_appinfo:           0,
-      include_played_free_games: 1,
-    });
-    const games     = data?.response?.games ?? [];
-    const gameCount = games.length;
-
-    // Se o jogador tiver se registrado, usa os dados dele
-    const registered = _registeredStats.get(steamId);
-    const result = {
-      gameCount,
-      totalAch   : registered?.totalAch   ?? null,
-      platCount  : registered?.platCount  ?? null,
-      registeredAt: registered?.registeredAt ?? null,
-    };
-
-    _setCached(cacheKey, result, 10 * 60 * 1000); // 10 min
-    return result;
-  } catch {
-    return { gameCount: 0, totalAch: null, platCount: null };
-  }
-}
-
-// ─── Endpoint: GET /api/leaderboard ──────────────────────────────────────────
-// Retorna lista ordenada por totalAch (desc), com fallback para gameCount.
-// Inclui o próprio usuário logado + até 100 amigos do Steam.
-app.get('/api/leaderboard', requireAuth, async (req, res) => {
-  const mySteamId = req.user.steamId;
-  const cacheKey  = `leaderboard:${mySteamId}`;
-  const cached    = _getCached(cacheKey);
-  if (cached) return res.json(cached);
-
-  try {
-    // 1. Busca lista de amigos (falha silenciosamente se perfil privado)
-    let friendIds = [];
-    try {
-      const friendData = await steamGet('/ISteamUser/GetFriendList/v1/', {
-        steamid      : mySteamId,
-        relationship : 'friend',
-      });
-      friendIds = (friendData?.friendslist?.friends ?? [])
-        .map((f) => f.steamid)
-        .slice(0, 99); // Steam GetPlayerSummaries aceita até 100 por chamada
-    } catch {
-      // Perfil privado — leaderboard só mostrará o próprio usuário
-    }
-
-    const allIds = [mySteamId, ...friendIds];
-
-    // 2. Busca summaries em lote (1 chamada para todos)
-    const summaryData = await steamGet('/ISteamUser/GetPlayerSummaries/v2/', {
-      steamids: allIds.join(','),
-    });
-    const players = summaryData?.response?.players ?? [];
-
-    // 3. Para cada jogador, busca stats leves em paralelo (pooled)
-    const POOL_LIMIT = 8;
-    const results    = new Array(players.length).fill(null);
-    let   nextIdx    = 0;
-
-    async function worker() {
-      while (nextIdx < players.length) {
-        const i = nextIdx++;
-        const p = players[i];
-        try {
-          const stats = await getLightStats(p.steamid);
-          // Registered stats override light stats
-          const reg = _registeredStats.get(p.steamid);
-          results[i] = {
-            steamId    : p.steamid,
-            personaName: p.personaname,
-            avatarUrl  : p.avatarfull,
-            profileUrl : p.profileurl,
-            isPrivate  : p.communityvisibilitystate < 3,
-            isMe       : p.steamid === mySteamId,
-            gameCount  : stats.gameCount,
-            totalAch   : reg?.totalAch   ?? null,
-            platCount  : reg?.platCount  ?? null,
-            rareCount  : reg?.rareCount  ?? null,
-            registeredAt: reg?.registeredAt ?? null,
-          };
-        } catch {
-          results[i] = null;
-        }
-      }
-    }
-
-    await Promise.all(
-      Array.from({ length: Math.min(POOL_LIMIT, players.length) }, worker)
-    );
-
-    const entries = results.filter(Boolean);
-
-    // 4. Sort: registered users by totalAch desc, then by gameCount desc
-    entries.sort((a, b) => {
-      const aScore = a.totalAch ?? -1;
-      const bScore = b.totalAch ?? -1;
-      if (bScore !== aScore) return bScore - aScore;
-      return (b.gameCount ?? 0) - (a.gameCount ?? 0);
-    });
-
-    // 5. Add rank position
-    const ranked = entries.map((e, i) => ({ ...e, rank: i + 1 }));
-
-    _setCached(cacheKey, ranked, 5 * 60 * 1000); // 5 min
-    return res.json(ranked);
-  } catch (err) {
-    console.error('[Leaderboard] Error:', err.message);
-    return res.status(500).json({ error: err.message });
-  }
-});
-
-// ─── Endpoint: POST /api/leaderboard/register ────────────────────────────────
-// Registra as stats do usuário logado no store global para que apareçam
-// no leaderboard dos amigos.
-// Chamado automaticamente pelo frontend após carregar os jogos.
-//
-//  Body: { totalAch: number, platCount: number, rareCount: number, gameCount: number }
-app.post('/api/leaderboard/register', requireAuth, (req, res) => {
-  const { totalAch, platCount, rareCount, gameCount } = req.body;
-  if (
-    typeof totalAch !== 'number' ||
-    typeof platCount !== 'number' ||
-    typeof gameCount !== 'number'
-  ) {
-    return res.status(400).json({ error: 'Invalid body' });
-  }
-
-  const steamId = req.user.steamId;
-  _registeredStats.set(steamId, {
-    steamId,
-    totalAch,
-    platCount,
-    rareCount : rareCount ?? 0,
-    gameCount,
-    registeredAt: Date.now(),
-  });
-
-  // Invalidate the leaderboard cache so updated stats appear immediately
-  for (const [key] of _profileCache) {
-    if (key.startsWith('leaderboard:')) _profileCache.delete(key);
-  }
-
-  console.log(`[Leaderboard] Registered stats for ${steamId}: ${totalAch} ach, ${platCount} plat`);
-  return res.json({ ok: true });
-});
-
-// ─── Endpoint: DELETE /api/leaderboard/cache ─────────────────────────────────
-// Força o refresh do cache do leaderboard (útil após re-carregar jogos).
-app.delete('/api/leaderboard/cache', requireAuth, (req, res) => {
-  for (const [key] of _profileCache) {
-    if (key.startsWith('leaderboard:') || key.startsWith('lightstats:')) {
-      _profileCache.delete(key);
-    }
-  }
-  return res.json({ ok: true });
 });
 
 // ─── Servir build do React em produção ───────────────────────────────────────
@@ -604,3 +450,339 @@ app.listen(PORT, () => {
     console.log(`   React:  http://localhost:5173  (npm run dev em outra aba)\n`);
   }
 });
+
+
+
+// =============================================================================
+//  server-leaderboard-patch.js  (v2 — SQLite)
+//
+//  Substitui a versão anterior (que usava Map em memória).
+//
+//  Cole no server.js LOGO ANTES do bloco:
+//    if (process.env.NODE_ENV === 'production') { ... }
+//
+//  Requer:
+//    npm install better-sqlite3
+//    const db = require('./db/db');   ← adicione no topo do server.js
+//
+//  Endpoints:
+//    POST   /api/leaderboard/register     → upserta stats do usuário logado
+//    GET    /api/leaderboard/global       → top N jogadores (paginado)
+//    GET    /api/leaderboard/friends      → amigos do Steam (combinado Steam + SQLite)
+//    GET    /api/leaderboard/search?q=    → busca por nome no SQLite
+//    GET    /api/leaderboard/me/rank      → posição global do usuário logado
+// =============================================================================
+
+'use strict';
+
+// ─── Adicione esta linha no TOPO do server.js, junto com os outros requires ──
+// const db = require('./db/db');
+// ─────────────────────────────────────────────────────────────────────────────
+
+// ─── Cache leve para o endpoint de amigos (evita hammerar Steam API) ─────────
+// O global usa SQLite diretamente — sem cache extra necessário.
+const _friendsCache = new Map();
+
+function getFriendsCache(steamId)        { return _friendsCache.get(steamId) ?? null; }
+function setFriendsCache(steamId, data)  { _friendsCache.set(steamId, { data, ts: Date.now() }); }
+function isFriendsCacheFresh(steamId)    {
+  const c = _friendsCache.get(steamId);
+  return c && Date.now() - c.ts < 5 * 60 * 1000; // 5 min
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  POST /api/leaderboard/register
+//  Registra (ou atualiza) os stats do usuário logado no SQLite.
+//  Deve ser chamado pelo frontend toda vez que os jogos terminam de carregar.
+//
+//  Body: { totalAch, platCount, rareCount, gameCount }
+// ─────────────────────────────────────────────────────────────────────────────
+app.post('/api/leaderboard/register', requireAuth, (req, res) => {
+  const { totalAch, platCount, rareCount, gameCount } = req.body;
+
+  if (
+    typeof totalAch  !== 'number' ||
+    typeof platCount !== 'number' ||
+    typeof gameCount !== 'number'
+  ) {
+    return res.status(400).json({ error: 'Body inválido: totalAch, platCount e gameCount são obrigatórios' });
+  }
+
+  const user = req.user;
+
+  try {
+    db.upsertPlayer({
+      steamId    : user.steamId,
+      personaName: user.personaName,
+      avatarUrl  : user.avatarUrl,
+      profileUrl : user.profileUrl,
+      isPrivate  : user.communityVisibilityState < 3,
+      totalAch,
+      platCount,
+      rareCount  : rareCount ?? 0,
+      gameCount,
+    });
+
+    // Invalida cache de amigos de qualquer um que tenha este usuário na lista
+    // (não temos essa info diretamente — simplesmente limpamos tudo)
+    _friendsCache.clear();
+
+    console.log(`[Leaderboard] ${user.personaName} registrado: ${totalAch} ach, ${platCount} plat`);
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error('[Leaderboard] Erro ao registrar:', err.message);
+    return res.status(500).json({ error: 'Erro interno ao salvar stats' });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  POST /api/leaderboard/register/:steamId
+//  Registra/atualiza stats de QUALQUER jogador pesquisado no leaderboard.
+//  Usado quando você pesquisa um amigo e quer sincronizar os dados dele.
+//
+//  Body: { totalAch, platCount, rareCount, gameCount, personaName, avatarUrl, profileUrl }
+// ─────────────────────────────────────────────────────────────────────────────
+app.post('/api/leaderboard/register/:steamId', requireAuth, async (req, res) => {
+  const { steamId } = req.params;
+  const { totalAch, platCount, rareCount, gameCount, personaName, avatarUrl, profileUrl } = req.body;
+
+  if (typeof totalAch !== 'number' || typeof platCount !== 'number' || typeof gameCount !== 'number') {
+    return res.status(400).json({ error: 'Body inválido: totalAch, platCount e gameCount são obrigatórios' });
+  }
+
+  try {
+    // Busca dados atualizados do jogador na Steam para ter infos frescas
+    let playerData;
+    try {
+      const summaryData = await steamGet('/ISteamUser/GetPlayerSummaries/v2/', { steamids: steamId });
+      const p = summaryData?.response?.players?.[0];
+      if (p) {
+        playerData = {
+          steamId: p.steamid,
+          personaName: p.personaname,
+          avatarUrl: p.avatarfull,
+          profileUrl: p.profileurl,
+          isPrivate: p.communityvisibilitystate < 3,
+        };
+      }
+    } catch {
+      // Se falhar, usa os dados do body
+      playerData = {
+        steamId,
+        personaName: personaName || 'Unknown',
+        avatarUrl: avatarUrl || '',
+        profileUrl: profileUrl || `https://steamcommunity.com/profiles/${steamId}`,
+        isPrivate: false,
+      };
+    }
+
+    db.upsertPlayer({
+      ...playerData,
+      totalAch,
+      platCount,
+      rareCount: rareCount ?? 0,
+      gameCount,
+    });
+
+    // Invalida cache
+    _friendsCache.clear();
+
+    console.log(`[Leaderboard] Jogador sincronizado: ${playerData.personaName} (${steamId}): ${totalAch} ach, ${platCount} plat`);
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error('[Leaderboard] Erro ao sincronizar jogador:', err.message);
+    return res.status(500).json({ error: 'Erro interno ao salvar stats' });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  GET /api/leaderboard/global?page=1&limit=50
+//  Retorna o ranking global de todos os usuários registrados no SQLite.
+//  Paginado. Inclui flag isMe para o usuário logado.
+// ─────────────────────────────────────────────────────────────────────────────
+app.get('/api/leaderboard/global', requireAuth, (req, res) => {
+  const page  = Math.max(1, parseInt(req.query.page  ?? '1',  10));
+  const limit = Math.min(100, Math.max(10, parseInt(req.query.limit ?? '50', 10)));
+  const mySteamId = req.user.steamId;
+
+  try {
+    const result = db.getGlobalLeaderboard(page, limit);
+
+    // Injeta flag isMe e garante rank correto
+    result.entries = result.entries.map((e, i) => ({
+      ...e,
+      rank: (page - 1) * limit + i + 1,
+      isMe: e.steamId === mySteamId,
+    }));
+
+    return res.json(result);
+  } catch (err) {
+    console.error('[Leaderboard] Erro ao buscar global:', err.message);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  GET /api/leaderboard/friends
+//  Retorna o ranking dos amigos do Steam + o próprio usuário.
+//
+//  Estratégia:
+//    1. Busca lista de amigos no Steam (pode falhar se perfil privado)
+//    2. Para amigos que estão no SQLite → usa dados do SQLite (ach real)
+//    3. Para amigos que NÃO estão no SQLite → busca gameCount no Steam API
+//    4. Ordena: registrados por totalAch desc, não-registrados por gameCount desc
+// ─────────────────────────────────────────────────────────────────────────────
+app.get('/api/leaderboard/friends', requireAuth, async (req, res) => {
+  const mySteamId = req.user.steamId;
+
+  // Serve cache se estiver fresco
+  if (isFriendsCacheFresh(mySteamId)) {
+    return res.json(getFriendsCache(mySteamId).data);
+  }
+
+  try {
+    // 1. Lista de amigos (silencia se perfil privado)
+    let friendIds = [];
+    try {
+      const fData = await steamGet('/ISteamUser/GetFriendList/v1/', {
+        steamid: mySteamId, relationship: 'friend',
+      });
+      friendIds = (fData?.friendslist?.friends ?? [])
+        .map(f => f.steamid)
+        .slice(0, 99);
+    } catch { /* perfil privado — só o próprio usuário */ }
+
+    const allIds = [mySteamId, ...friendIds];
+
+    // 2. Busca summaries no Steam (1 request para todos)
+    const summaryData = await steamGet('/ISteamUser/GetPlayerSummaries/v2/', {
+      steamids: allIds.join(','),
+    });
+    const steamPlayers = summaryData?.response?.players ?? [];
+
+    // 3. Quem já está no SQLite?
+    const dbEntries  = db.getPlayersByIds(allIds);
+    const dbMap      = new Map(dbEntries.map(e => [e.steamId, e]));
+
+    // 4. Para os que não estão no SQLite, busca gameCount em paralelo (pool de 6)
+    const notInDb    = steamPlayers.filter(p => !dbMap.has(p.steamid));
+    const gameCountMap = new Map();
+
+    const POOL = 6;
+    let idx = 0;
+    async function worker() {
+      while (idx < notInDb.length) {
+        const p = notInDb[idx++];
+        try {
+          const gData = await steamGet('/IPlayerService/GetOwnedGames/v1/', {
+            steamid: p.steamid, include_appinfo: 0, include_played_free_games: 1,
+          });
+          gameCountMap.set(p.steamid, gData?.response?.games?.length ?? 0);
+        } catch {
+          gameCountMap.set(p.steamid, 0);
+        }
+      }
+    }
+    await Promise.all(Array.from({ length: Math.min(POOL, notInDb.length) }, worker));
+
+    // 5. Monta lista unificada
+    const entries = steamPlayers.map(p => {
+      const dbEntry = dbMap.get(p.steamid);
+      if (dbEntry) {
+        return {
+          ...dbEntry,
+          personaName: p.personaname, // sempre usa nome fresco do Steam
+          avatarUrl  : p.avatarfull,
+          isMe       : p.steamid === mySteamId,
+          isPrivate  : p.communityvisibilitystate < 3,
+        };
+      }
+      return {
+        steamId     : p.steamid,
+        personaName : p.personaname,
+        avatarUrl   : p.avatarfull,
+        profileUrl  : p.profileurl,
+        isPrivate   : p.communityvisibilitystate < 3,
+        isMe        : p.steamid === mySteamId,
+        totalAch    : null,
+        platCount   : null,
+        rareCount   : null,
+        gameCount   : gameCountMap.get(p.steamid) ?? 0,
+        registeredAt: null,
+        rank        : null,
+      };
+    });
+
+    // 6. Sort: apenas por totalAch (conquistas). Registrados primeiro, não-registrados no final.
+    entries.sort((a, b) => {
+      const aHas = a.totalAch != null;
+      const bHas = b.totalAch != null;
+      if (aHas && bHas)  return b.totalAch - a.totalAch;
+      if (aHas && !bHas) return -1;
+      if (!aHas && bHas) return  1;
+      return 0; // Não-registrados mantêm ordem original
+    });
+
+    // 7. Atribui ranks
+    const ranked = entries.map((e, i) => ({ ...e, rank: i + 1 }));
+
+    setFriendsCache(mySteamId, ranked);
+    return res.json(ranked);
+  } catch (err) {
+    console.error('[Leaderboard] Erro amigos:', err.message);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  GET /api/leaderboard/search?q=nome
+//  Busca jogadores pelo nome dentro do SQLite.
+// ─────────────────────────────────────────────────────────────────────────────
+app.get('/api/leaderboard/search', requireAuth, (req, res) => {
+  const q = (req.query.q ?? '').trim();
+  if (!q || q.length < 2) return res.json([]);
+
+  const mySteamId = req.user.steamId;
+
+  try {
+    const results = db.searchPlayers(q).map((e, i) => ({
+      ...e,
+      rank: i + 1,
+      isMe: e.steamId === mySteamId,
+    }));
+    return res.json(results);
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  GET /api/leaderboard/me/rank
+//  Retorna a posição global do usuário logado.
+// ─────────────────────────────────────────────────────────────────────────────
+app.get('/api/leaderboard/me/rank', requireAuth, (req, res) => {
+  try {
+    const rank = db.getGlobalRank(req.user.steamId);
+    return res.json({ rank });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Atualiza o perfil do usuário no SQLite a cada login
+//  (coloque dentro do callback do passport.use, depois de done(null, user))
+//
+//  Adicione no bloco passport.use de Steam, dentro do try, DEPOIS do done:
+//
+//    const user = await getPlayerSummary(profile.id);
+//    // ── Mantém perfil fresco no SQLite ──
+//    db.updateProfile({
+//      steamId    : user.steamId,
+//      personaName: user.personaName,
+//      avatarUrl  : user.avatarUrl,
+//      profileUrl : user.profileUrl,
+//      isPrivate  : user.communityVisibilityState < 3,
+//    });
+//    done(null, user);
+// ─────────────────────────────────────────────────────────────────────────────

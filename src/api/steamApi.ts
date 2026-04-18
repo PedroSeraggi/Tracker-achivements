@@ -225,3 +225,27 @@ export async function registerLeaderboardStats(stats: {
     body       : JSON.stringify(stats),
   });
 }
+
+/**
+ * Sincroniza os dados de um jogador pesquisado no leaderboard.
+ * Usado quando você pesquisa um amigo e quer adicionar ele ao ranking.
+ */
+export async function syncPlayerToLeaderboard(
+  steamId: string,
+  stats: {
+    totalAch: number;
+    platCount: number;
+    rareCount: number;
+    gameCount: number;
+    personaName: string;
+    avatarUrl: string;
+    profileUrl: string;
+  }
+): Promise<void> {
+  await fetch(`/api/leaderboard/register/${steamId}`, {
+    method     : 'POST',
+    credentials: 'include',
+    headers    : { 'Content-Type': 'application/json' },
+    body       : JSON.stringify(stats),
+  });
+}
