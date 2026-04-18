@@ -6,6 +6,7 @@ import type {
   ApiAchievement,
   ApiGame,
 } from '../types';
+import type { ProfileBackground } from '../hooks/useProfileData';
 
 const BASE = ''; // same-origin — proxied by Vite → Express
 
@@ -146,7 +147,8 @@ export async function fetchGames(
     }
   }
 
-  const url      = steamId ? `/api/player/${steamId}/games` : '/api/games';
+  // Use /library endpoint for other players to get complete game list
+  const url      = steamId ? `/api/player/${steamId}/library` : '/api/games';
   const rawGames = await apiFetch<ApiGame[]>(url);
   const eligible = rawGames.filter((g) => g.has_community_visible_stats);
   const total    = eligible.length;
@@ -182,6 +184,11 @@ export async function fetchAchievements(
 // ─── Player search ────────────────────────────────────────────────────────────
 export async function searchPlayer(query: string): Promise<SteamUser> {
   return apiFetch<SteamUser>(`/api/search?q=${encodeURIComponent(query)}`);
+}
+
+// ─── Player profile background ───────────────────────────────────────────────
+export async function fetchPlayerBackground(steamId: string): Promise<ProfileBackground> {
+  return apiFetch<ProfileBackground>(`/api/player/${steamId}/background`);
 }
 
 // ─── Guides ───────────────────────────────────────────────────────────────────

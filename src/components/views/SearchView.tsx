@@ -1,13 +1,33 @@
+// =============================================================================
+//  src/components/search/SearchView.tsx  (atualizado)
+//
+//  Roteador de views da aba de Busca. Responsabilidades:
+//    · SearchHome  — input + resultado da busca
+//    · PlayerProfilePage — perfil completo do jogador encontrado (NOVO)
+//    · SearchGameDetail  — detalhe de um jogo + botão de comparação
+//    · CompareView       — comparação lado a lado de conquistas
+//
+//  Nenhuma mudança de store necessária.
+// =============================================================================
+
 import React, { useRef } from 'react';
-import { useAppStore, selectFilteredSearchGames, selectSearchActiveGame } from '../../store/useAppStore';
-import { Avatar, FilterBar, ProgressBar, Empty } from '../ui';
+import {
+  useAppStore,
+  selectFilteredSearchGames,
+  selectSearchActiveGame,
+} from '../../store/useAppStore';
+import { Avatar, FilterBar, Empty } from '../ui';
 import GameCard from '../dashboard/GameCard';
 import AchievementItem from '../dashboard/AchievementItem';
 import CompareView from './CompareView';
+import PlayerProfilePage from './PlayerProfilePage';
 import { usePlayerSearch } from '../../hooks';
 import type { GameFilter, AchFilter } from '../../types';
 
-// ── Search home (input + results) ──────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════════
+//  SEARCH HOME — input + found player card
+// ══════════════════════════════════════════════════════════════════════════════
+
 const SearchHome: React.FC = () => {
   const query               = useAppStore((s) => s.searchQuery);
   const setQuery            = useAppStore((s) => s.setSearchQuery);
@@ -24,18 +44,20 @@ const SearchHome: React.FC = () => {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const SEARCH_FILTERS: { value: GameFilter; label: string }[] = [
-    { value: 'all',     label: 'Todos' },
-    { value: 'started', label: 'Em Progresso' },
-    { value: 'platinum', label: 'Platinados' },
+    { value: 'all',      label: 'Todos'        },
+    { value: 'started',  label: 'Em Progresso' },
+    { value: 'platinum', label: 'Platinados'   },
   ];
 
   const handleSearch = () => {
-    if (query.trim()) search(query.trim());
+    const q = query.trim();
+    if (q && !searchLoading) search(q);
   };
 
   return (
     <div id="search-home-view">
-      {/* Hero */}
+
+      {/* ── Hero search input ────────────────────────────────────────── */}
       <div className="search-hero">
         <div className="search-hero-icon">🔍</div>
         <h2 className="search-hero-title">Buscar Jogadores</h2>
@@ -48,33 +70,33 @@ const SearchHome: React.FC = () => {
             ref={inputRef}
             type="text"
             className="search-player-input"
-            placeholder="ex: 76561198012345678 ou meuNomeSteam ou steamcommunity.com/id/nome"
+            placeholder="ex: 76561198012345678  •  meuNomeSteam  •  steamcommunity.com/id/nome"
             autoComplete="off"
             spellCheck={false}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && !searchLoading && handleSearch()}
+            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
           />
           <button
             className="btn-search-player"
             onClick={handleSearch}
             disabled={searchLoading}
-            style={{ opacity: searchLoading ? 0.6 : 1 }}
           >
             {searchLoading ? '⏳' : 'Buscar'}
           </button>
         </div>
 
         {searchError && (
-          <div className="search-error">{searchError}</div>
+          <div className="search-error">⚠ {searchError}</div>
         )}
       </div>
 
-      {/* Found player */}
+      {/* ── Found player card ────────────────────────────────────────── */}
       {searchedPlayer && (
-        <div id="search-result">
+        <div id="search-result" style={{ padding: '0 20px' }}>
           <div className="found-player-card" id="found-player-card">
-            <Avatar src={searchedPlayer.user.avatarUrl} size={72} />
+            <Avatar src={searchedPlayer.user.avatarUrl} size={64} />
+
             <div className="found-info">
               <div className="found-name">{searchedPlayer.user.personaName}</div>
               {searchedPlayer.user.realName && (
@@ -88,47 +110,52 @@ const SearchHome: React.FC = () => {
                   rel="noopener noreferrer"
                   className="found-link"
                 >
-                  Ver no Steam
+                  Ver no Steam ↗
                 </a>
                 {searchedPlayer.user.communityVisibilityState < 3 && (
                   <span className="found-private-badge">🔒 Perfil Privado</span>
                 )}
               </div>
             </div>
-            {!searchedPlayer.gamesLoaded && (
+
+            {/* CTA: load or open profile */}
+            {!searchedPlayer.gamesLoaded ? (
               <button
                 className="btn-load-games"
                 onClick={() => loadPlayerGames(searchedPlayer.user.steamId)}
                 disabled={searchLoading}
-                style={{ opacity: searchLoading ? 0.6 : 1 }}
               >
-                {searchLoading ? '⏳ Carregando...' : 'Carregar Jogos'}
+                {searchLoading ? '⏳ Carregando...' : '🎮 Carregar Perfil'}
               </button>
-            )}
-            {searchedPlayer.gamesLoaded && (
+            ) : (
               <button
                 className="btn-load-games"
                 onClick={() => setSearchView('profile')}
               >
-                Ver Perfil
+                Ver Perfil →
               </button>
             )}
           </div>
 
-          {/* Games grid for searched player */}
+          {/* ── Inline games grid (fallback when profile not opened) ─── */}
           {searchedPlayer.gamesLoaded && (
             <div id="search-games-section">
               <div className="search-games-header">
-                <span id="search-games-title" style={{ fontSize: 14, fontWeight: 600, color: 'var(--txt2)', letterSpacing: 1 }}>
-                  {filteredGames.length} Jogos
+                <span
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: 'var(--txt2)',
+                    letterSpacing: '0.5px',
+                  }}
+                >
+                  {filteredGames.length} jogos — clique em "Ver Perfil" para a visão completa
                 </span>
-                <div className="search-games-filters">
-                  <FilterBar
-                    options={SEARCH_FILTERS}
-                    active={searchGameFilter}
-                    onChange={setSearchGameFilter}
-                  />
-                </div>
+                <FilterBar
+                  options={SEARCH_FILTERS}
+                  active={searchGameFilter}
+                  onChange={setSearchGameFilter}
+                />
               </div>
               <div className="games-grid" id="search-games-grid">
                 {filteredGames.map((g) => (
@@ -136,7 +163,10 @@ const SearchHome: React.FC = () => {
                     key={g.appId}
                     game={g}
                     readonly
-                    onClick={() => openSearchGameDetail(g.appId)}
+                    onClick={() => {
+                      openSearchGameDetail(g.appId);
+                      setSearchView('game');
+                    }}
                   />
                 ))}
               </div>
@@ -148,102 +178,27 @@ const SearchHome: React.FC = () => {
   );
 };
 
-// ── Searched player profile ────────────────────────────────────────────────────
-const SearchProfileView: React.FC = () => {
-  const searchedPlayer = useAppStore((s) => s.searchedPlayer);
-  const setSearchView  = useAppStore((s) => s.setSearchView);
-  const openSearchGameDetail = useAppStore((s) => s.openSearchGameDetail);
-  const filteredGames  = useAppStore(selectFilteredSearchGames);
-  const searchGameFilter = useAppStore((s) => s.searchGameFilter);
-  const setSearchGameFilter = useAppStore((s) => s.setSearchGameFilter);
+// ══════════════════════════════════════════════════════════════════════════════
+//  SEARCH GAME DETAIL — achievement list for a specific searched game
+// ══════════════════════════════════════════════════════════════════════════════
 
-  const SEARCH_FILTERS: { value: GameFilter; label: string }[] = [
-    { value: 'all',      label: 'Todos' },
-    { value: 'started',  label: 'Em Progresso' },
-    { value: 'platinum', label: 'Platinados' },
-  ];
-
-  if (!searchedPlayer) return null;
-  const { user, games } = searchedPlayer;
-  const totalUnlocked = games.reduce((s, g) => s + g.unlockedCount, 0);
-  const totalAch      = games.reduce((s, g) => s + g.totalCount, 0);
-  const pct           = totalAch > 0 ? Math.round((totalUnlocked / totalAch) * 100) : 0;
-
-  return (
-    <div id="search-profile-detail">
-      <button className="detail-back" onClick={() => setSearchView('home')}>
-        ← Voltar à Busca
-      </button>
-
-      <div id="search-profile-container" className="profile-container" style={{ padding: '0 20px' }}>
-        {/* Player card */}
-        <div
-          style={{
-            display: 'flex',
-            gap: 16,
-            alignItems: 'center',
-            background: 'var(--bg2)',
-            border: '1px solid var(--b2)',
-            borderRadius: 14,
-            padding: '20px 22px',
-            marginBottom: 20,
-          }}
-        >
-          <Avatar src={user.avatarUrl} size={64} />
-          <div>
-            <div style={{ fontSize: 20, fontWeight: 900, color: '#fff' }}>{user.personaName}</div>
-            <div style={{ fontSize: 12, color: 'var(--txt3)', fontFamily: 'monospace' }}>
-              {user.steamId}
-            </div>
-            <a href={user.profileUrl} target="_blank" rel="noopener noreferrer" className="found-link" style={{ marginTop: 8, display: 'inline-block' }}>
-              Ver no Steam
-            </a>
-          </div>
-          <div style={{ marginLeft: 'auto', textAlign: 'center' }}>
-            <div style={{ fontSize: 28, fontWeight: 900, color: 'var(--accent)' }}>{pct}%</div>
-            <div style={{ fontSize: 12, color: 'var(--txt2)' }}>{totalUnlocked}/{totalAch}</div>
-            <ProgressBar percent={pct} height={4} />
-          </div>
-        </div>
-
-        {/* Games */}
-        <div style={{ marginBottom: 12 }}>
-          <FilterBar options={SEARCH_FILTERS} active={searchGameFilter} onChange={setSearchGameFilter} />
-        </div>
-        {filteredGames.length === 0 ? (
-          <Empty icon="🎮" title="Nenhum jogo encontrado" />
-        ) : (
-          <div className="games-grid">
-            {filteredGames.map((g) => (
-              <GameCard
-                key={g.appId}
-                game={g}
-                readonly
-                onClick={() => openSearchGameDetail(g.appId)}
-              />
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
-
-// ── Searched game detail ───────────────────────────────────────────────────────
 const SearchGameDetail: React.FC = () => {
-  const game            = useAppStore(selectSearchActiveGame);
-  const achFilter       = useAppStore((s) => s.searchAchFilter);
-  const setAchFilter    = useAppStore((s) => s.setSearchAchFilter);
-  const closeDetail     = useAppStore((s) => s.closeSearchGameDetail);
-  const setSearchView   = useAppStore((s) => s.setSearchView);
-  const myGame          = useAppStore((s) =>
+  const game              = useAppStore(selectSearchActiveGame);
+  const achFilter         = useAppStore((s) => s.searchAchFilter);
+  const setAchFilter      = useAppStore((s) => s.setSearchAchFilter);
+  const closeDetail       = useAppStore((s) => s.closeSearchGameDetail);
+  const setSearchView     = useAppStore((s) => s.setSearchView);
+  const searchedPlayer    = useAppStore((s) => s.searchedPlayer);
+
+  // Whether I have this game too (enables compare)
+  const myGame = useAppStore((s) =>
     s.games.find((g) => g.appId === s.searchActiveGameAppId)
   );
 
   const ACH_FILTERS: { value: AchFilter; label: string }[] = [
-    { value: 'all',      label: 'Todos' },
+    { value: 'all',      label: 'Todos'         },
     { value: 'unlocked', label: 'Desbloqueados' },
-    { value: 'locked',   label: 'Bloqueados' },
+    { value: 'locked',   label: 'Bloqueados'    },
   ];
 
   if (!game) return null;
@@ -256,13 +211,23 @@ const SearchGameDetail: React.FC = () => {
     }
   })();
 
+  // Back destination: if we came from the full profile, go back there
+  const handleBack = () => {
+    if (searchedPlayer?.gamesLoaded) {
+      setSearchView('profile');
+    } else {
+      closeDetail();
+      setSearchView('home');
+    }
+  };
+
   return (
     <div id="search-game-detail">
-      <button className="detail-back" onClick={closeDetail}>
+      <button className="detail-back" onClick={handleBack}>
         ← Voltar ao Perfil
       </button>
 
-      {/* Banner */}
+      {/* ── Banner ──────────────────────────────────────────────────── */}
       <div className="detail-banner">
         <div
           className="detail-banner-bg"
@@ -279,15 +244,30 @@ const SearchGameDetail: React.FC = () => {
             </div>
             <div className="detail-banner-pct">
               <div className="detail-pct">{game.percentage}%</div>
-              <div className="detail-achcount">{game.unlockedCount} / {game.totalCount}</div>
+              <div className="detail-achcount">
+                {game.unlockedCount} / {game.totalCount}
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Filters + Compare button */}
-      <div className="ach-filters" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
-        <FilterBar options={ACH_FILTERS} active={achFilter} onChange={setAchFilter} />
+      {/* ── Filters + compare CTA ───────────────────────────────────── */}
+      <div
+        className="ach-filters"
+        style={{
+          display        : 'flex',
+          alignItems     : 'center',
+          justifyContent : 'space-between',
+          flexWrap       : 'wrap',
+          gap            : 8,
+        }}
+      >
+        <FilterBar
+          options={ACH_FILTERS}
+          active={achFilter}
+          onChange={setAchFilter}
+        />
         {myGame && (
           <button
             className="btn-compare"
@@ -298,23 +278,31 @@ const SearchGameDetail: React.FC = () => {
         )}
       </div>
 
-      <div className="ach-list">
-        {achievements.map((ach) => (
-          <AchievementItem key={ach.apiName} achievement={ach} readonly />
-        ))}
-      </div>
+      {/* ── Achievement list ─────────────────────────────────────────── */}
+      {achievements.length === 0 ? (
+        <Empty icon="🏅" title="Nenhuma conquista nesta categoria" />
+      ) : (
+        <div className="ach-list">
+          {achievements.map((ach) => (
+            <AchievementItem key={ach.apiName} achievement={ach} readonly />
+          ))}
+        </div>
+      )}
     </div>
   );
 };
 
-// ── SearchView router ──────────────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════════
+//  SEARCH VIEW ROUTER
+// ══════════════════════════════════════════════════════════════════════════════
+
 const SearchView: React.FC = () => {
   const searchView = useAppStore((s) => s.searchView);
 
   return (
     <div id="view-search">
       {searchView === 'home'    && <SearchHome />}
-      {searchView === 'profile' && <SearchProfileView />}
+      {searchView === 'profile' && <PlayerProfilePage />}
       {searchView === 'game'    && <SearchGameDetail />}
       {searchView === 'compare' && <CompareView />}
     </div>

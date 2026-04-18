@@ -255,6 +255,38 @@ app.get('/api/profile/background', requireAuth, async (req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+//  GET /api/player/:steamId/background
+//  Retorna o background de perfil de qualquer jogador.
+// ─────────────────────────────────────────────────────────────────────────────
+app.get('/api/player/:steamId/background', async (req, res) => {
+  const { steamId } = req.params;
+  if (!steamId || !/^\d+$/.test(steamId)) {
+    return res.status(400).json({ error: 'Invalid steamId' });
+  }
+
+  const cacheKey = `bg:${steamId}`;
+  const cached = _getCached(cacheKey);
+  if (cached) return res.json(cached);
+
+  try {
+    const url = new URL('https://api.steampowered.com/IPlayerService/GetProfileBackground/v1/');
+    url.searchParams.set('key', process.env.STEAM_API_KEY);
+    url.searchParams.set('steamid', steamId);
+
+    const r = await fetch(url.toString());
+    if (!r.ok) throw new Error(`Steam returned ${r.status}`);
+
+    const data = await r.json();
+    const result = data?.response ?? {};
+    _setCached(cacheKey, result, 5 * 60 * 1000); // 5 min
+    return res.json(result);
+  } catch (err) {
+    console.error('[Player Background] error:', err.message);
+    return res.json({});   // degradação graciosa
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 //  GET /api/profile/recent-games
 //  Retorna os jogos jogados recentemente pelo usuário logado.
 //

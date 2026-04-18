@@ -4,6 +4,55 @@ import { Avatar, ProgressBar, Empty } from '../ui';
 import { useProfileData, bgImageUrl, bgVideoUrl, gameIconUrl, formatPlaytime } from '../../hooks/useProfileData';
 import type { Game, Achievement, FeaturedType, FeaturedCard, FeaturedSection } from '../../types';
 
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+type AchWithGame = Achievement & { gameName: string; appId: number };
+
+// ─── Sub-components ───────────────────────────────────────────────────────────
+
+/** Row de conquista recente */
+const RecentAchRow: React.FC<{ ach: AchWithGame }> = ({ ach }) => {
+  const isRare = ach.globalPercent != null && ach.globalPercent <= 10;
+  return (
+    <div className="pp-recent-row">
+      <img
+        className="pp-recent-icon"
+        src={ach.iconUrl}
+        alt={ach.displayName}
+        onError={(e) => ((e.currentTarget as HTMLImageElement).style.visibility = 'hidden')}
+      />
+      <div className="pp-recent-info">
+        <div className="pp-recent-name">{ach.displayName}</div>
+        <div className="pp-recent-game">{ach.gameName}</div>
+      </div>
+      {isRare && (
+        <div className="pp-rare-badge" title={`${ach.globalPercent!.toFixed(1)}% dos jogadores`}>
+          💎 {ach.globalPercent!.toFixed(1)}%
+        </div>
+      )}
+    </div>
+  );
+};
+
+/** Row de conquista rara */
+const RareAchRow: React.FC<{ ach: AchWithGame }> = ({ ach }) => (
+  <div className="pp-rare-row">
+    <img
+      className="pp-rare-icon"
+      src={ach.iconUrl}
+      alt={ach.displayName}
+      onError={(e) => ((e.currentTarget as HTMLImageElement).style.visibility = 'hidden')}
+    />
+    <div className="pp-rare-info">
+      <div className="pp-rare-name">{ach.displayName}</div>
+      <div className="pp-rare-game">{ach.gameName}</div>
+    </div>
+    <div className="pp-rare-badge" title={`${ach.globalPercent!.toFixed(1)}% dos jogadores`}>
+      💎 {ach.globalPercent!.toFixed(1)}%
+    </div>
+  </div>
+);
+
 // ─── Card Utils (mesmo cálculo do duelo) ────────────────────────────────────
 
 type RarityName = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary' | 'mythic';
@@ -614,6 +663,38 @@ const ProfileView: React.FC = () => {
     [games],
   );
 
+  // ── Conquistas recentes ─────────────────────────────────────────────────
+  const recentAchs = useMemo<AchWithGame[]>(() => {
+    const all: AchWithGame[] = [];
+    for (const g of games) {
+      for (const a of g.achievements) {
+        if (a.achieved && a.unlockTime && a.unlockTime > 0) {
+          all.push({ ...a, gameName: g.name, appId: g.appId });
+        }
+      }
+    }
+    return all.sort((a, b) => (b.unlockTime ?? 0) - (a.unlockTime ?? 0)).slice(0, 9);
+  }, [games]);
+
+  // ── Conquistas raras ──────────────────────────────────────────────────────
+  const rarestAchs = useMemo<AchWithGame[]>(() => {
+    const all: AchWithGame[] = [];
+    for (const g of games) {
+      for (const a of g.achievements) {
+        if (a.achieved && a.globalPercent != null && a.globalPercent <= 5) {
+          all.push({ ...a, gameName: g.name, appId: g.appId });
+        }
+      }
+    }
+    return all.sort((a, b) => (a.globalPercent ?? 0) - (b.globalPercent ?? 0)).slice(0, 6);
+  }, [games]);
+
+  // ── Top jogos ─────────────────────────────────────────────────────────────
+  const topGames = useMemo(
+    () => [...games].filter((g) => g.totalCount > 0).sort((a, b) => b.percentage - a.percentage).slice(0, 5),
+    [games],
+  );
+
   if (!currentUser) return <Empty icon="👤" title="Usuário não carregado" />;
 
   // ── Background URLs ───────────────────────────────────────────────────────
@@ -817,7 +898,7 @@ const ProfileView: React.FC = () => {
             { icon: '📊', label: '% Global',   value: `${pct}%`,                      color: 'var(--accent)' },
             { icon: '✦',  label: 'Platinas',   value: String(platCount),              color: 'var(--plat, #e5e4e2)' },
             { icon: '🎮', label: 'Jogos',      value: String(games.length),           color: '#fff' },
-            { icon: '⭐', label: 'XP Total',   value: xp.toLocaleString('pt-BR'),     color: '#fbbf24' },
+            { icon: '⭐', label: 'Horas Totais', value: formatPlaytime(games.reduce((sum, g) => sum + (g.playtimeForever || 0), 0)), color: '#fbbf24' },
           ].map(s => (
             <div key={s.label} className="profile-stat-card">
               <div className="profile-stat-icon">{s.icon}</div>
@@ -1193,6 +1274,67 @@ const ProfileView: React.FC = () => {
               </>
             );
           })()}
+        </section>
+
+        {/* ═══════════════════════════════════════════════════════════════════
+            SEÇÃO: ESTATÍSTICAS (Duas colunas: Recentes + Raras/Melhores)
+            ═══════════════════════════════════════════════════════════════ */}
+        <section className="profile-section">
+          <h3 className="profile-section-title">📊 Estatísticas</h3>
+
+          <div className="pp-two-col" style={{ marginTop: 16 }}>
+            {/* LEFT — Conquistas Recentes */}
+            <div className="pp-section">
+              <h4 className="pp-section-title">⏱ Conquistas Recentes</h4>
+              {recentAchs.length === 0 ? (
+                <Empty icon="🏅" title="Nenhuma conquista recente" />
+              ) : (
+                <div className="pp-recent-list">
+                  {recentAchs.map((a) => <RecentAchRow key={`${a.appId}-${a.apiName}`} ach={a} />)}
+                </div>
+              )}
+            </div>
+
+            {/* RIGHT — Raras + Melhores */}
+            <div className="pp-right-col">
+              {rarestAchs.length > 0 && (
+                <div className="pp-section">
+                  <h4 className="pp-section-title">💎 Conquistas Raras</h4>
+                  <div className="pp-rare-list">
+                    {rarestAchs.map((a) => <RareAchRow key={`${a.appId}-${a.apiName}`} ach={a} />)}
+                  </div>
+                </div>
+              )}
+
+              <div className="pp-section">
+                <h4 className="pp-section-title">🏅 Melhores Jogos</h4>
+                {topGames.length === 0 ? (
+                  <Empty icon="🎮" title="Nenhum jogo com conquistas" />
+                ) : (
+                  <div className="pp-top-games">
+                    {topGames.map((g) => (
+                      <div
+                        key={g.appId}
+                        className="pp-top-game-row"
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => openGameDetail(g.appId)}
+                        title={`${g.name} — ${g.percentage}%`}
+                      >
+                        <img className="pp-top-game-img" src={g.headerImage} alt={g.name} />
+                        <div className="pp-top-game-info">
+                          <div className="pp-top-game-name">{g.name}</div>
+                          <ProgressBar percent={g.percentage} height={4} />
+                        </div>
+                        <span className="pp-top-game-pct">{g.percentage}%</span>
+                        {g.trophyTier === 'platinum' && <div className="pp-top-game-trophy">🏆</div>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
         </section>
 
       </div>{/* /profile-content */}

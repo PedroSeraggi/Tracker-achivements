@@ -5,6 +5,7 @@ import './index.css';
 import './battle.css';
 import './profile.css';
 import './trophy-duel.css';
+import './player-profile.css';
 import './battle-board.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
