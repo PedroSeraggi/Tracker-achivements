@@ -1,11 +1,12 @@
 
 
-import React, { useMemo, useCallback, useState, useEffect } from 'react';
+import React, { useMemo, useCallback, useState, useEffect, memo } from 'react';
 import { useAppStore, selectFilteredSearchGames } from '../../store/useAppStore';
 import { Avatar, FilterBar, Empty, ProgressBar } from '../ui';
 import GameCard from '../dashboard/GameCard';
 import { fetchPlayerBackground, syncPlayerToLeaderboard, fetchPlayerFriends, type PlayerFriend } from '../../api/steamApi';
 import { bgImageUrl, bgVideoUrl, type ProfileBackground } from '../../hooks/useProfileData';
+import { logger } from '../../utils/logger';
 import type { Game, GameFilter, Achievement } from '../../types';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -21,8 +22,8 @@ function formatPlaytime(minutes: number): string {
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-/** Row de conquista recente */
-const RecentAchRow: React.FC<{ ach: AchWithGame }> = ({ ach }) => {
+/** Row de conquista recente - memoizado */
+const RecentAchRow: React.FC<{ ach: AchWithGame }> = memo(({ ach }) => {
   const isRare = ach.globalPercent != null && ach.globalPercent <= 10;
   return (
     <div className="pp-recent-row">
@@ -43,10 +44,10 @@ const RecentAchRow: React.FC<{ ach: AchWithGame }> = ({ ach }) => {
       )}
     </div>
   );
-};
+});
 
-/** Row de conquista rara */
-const RareAchRow: React.FC<{ ach: AchWithGame }> = ({ ach }) => (
+/** Row de conquista rara - memoizado */
+const RareAchRow: React.FC<{ ach: AchWithGame }> = memo(({ ach }) => (
   <div className="pp-rare-row">
     <img
       className="pp-rare-icon"
@@ -60,14 +61,14 @@ const RareAchRow: React.FC<{ ach: AchWithGame }> = ({ ach }) => (
     </div>
     <div className="pp-rare-pct">{ach.globalPercent!.toFixed(2)}%</div>
   </div>
-);
+));
 
-/** Seção de Jogos com subabas para organização */
+/** Seção de Jogos com subabas - memoizada */
 const PlayerGamesSection: React.FC<{ 
   games: Game[]; 
   onOpenGame: (appId: number) => void;
   isLoading?: boolean;
-}> = ({ games, onOpenGame, isLoading }) => {
+}> = memo(({ games, onOpenGame, isLoading }) => {
   type GameTab = 'recent' | 'playing' | 'platinum' | 'all';
   const [activeTab, setActiveTab] = useState<GameTab>('recent');
   const [isMinimized, setIsMinimized] = useState(false);
@@ -248,13 +249,13 @@ const PlayerGamesSection: React.FC<{
       )}
     </section>
   );
-};
+});
 
-/** Carousel de Top Games (mais jogados) - similar ao jogados recentemente */
+/** Carousel de Top Games - memoizado */
 const TopGamesCarousel: React.FC<{
   games: Game[];
   onOpenGame: (appId: number) => void;
-}> = ({ games, onOpenGame }) => {
+}> = memo(({ games, onOpenGame }) => {
   const topGames = useMemo(() => 
     [...games]
       .sort((a, b) => b.playtimeForever - a.playtimeForever)
@@ -368,13 +369,13 @@ const TopGamesCarousel: React.FC<{
       </div>
     </section>
   );
-};
+});
 
-/** Seção de Jogos Platinados com Top 5 Conquistas mais Difíceis */
+/** Seção de Jogos Platinados - memoizada */
 const PlatinumGamesSection: React.FC<{
   games: Game[];
   onOpenGame: (appId: number) => void;
-}> = ({ games, onOpenGame }) => {
+}> = memo(({ games, onOpenGame }) => {
   // Jogos platinados (100% completos)
   const platinumGames = useMemo(() => 
     games
@@ -692,7 +693,7 @@ const PlatinumGamesSection: React.FC<{
       </div>
     </section>
   );
-};
+});
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 

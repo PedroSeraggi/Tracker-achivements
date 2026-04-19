@@ -23,6 +23,7 @@ const session   = require('express-session');
 const passport  = require('passport');
 const Steam     = require('passport-steam').Strategy;
 const path      = require('path');
+const compression = require('compression');
 const db        = require('./db');
 
 // ─── Config ──────────────────────────────────────────────────────────────────
@@ -30,6 +31,8 @@ const API_KEY     = process.env.STEAM_API_KEY;
 const SECRET      = process.env.SESSION_SECRET || 'change-me-in-production';
 const PORT        = parseInt(process.env.PORT || '3000', 10);
 const BASE_URL    = process.env.BASE_URL || `http://localhost:${PORT}`;
+const NODE_ENV    = process.env.NODE_ENV || 'development';
+const isDev       = NODE_ENV === 'development';
 
 if (!API_KEY) {
   console.error('❌  STEAM_API_KEY não encontrada no .env');
@@ -172,6 +175,16 @@ passport.use(new Steam(
 // ─── App ─────────────────────────────────────────────────────────────────────
 const app = express();
 
+// ─── Middlewares ─────────────────────────────────────────────────────────────
+// Compressão gzip para reduzir tamanho das respostas
+app.use(compression({
+  level: 6,
+  filter: (req, res) => {
+    if (req.headers['x-no-compression']) return false;
+    return compression.filter(req, res);
+  }
+}));
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
@@ -188,6 +201,38 @@ app.use(session({
 
 app.use(passport.initialize());
 app.use(passport.session());
+
+// Cache headers middleware
+function cacheControl(maxAgeSeconds) {
+  return (req, res, next) => {
+    if (!isDev) {
+      res.set('Cache-Control', `public, max-age=${maxAgeSeconds}`);
+    }
+    next();
+  };
+}
+
+// Request deduplication middleware
+const pendingRequests = new Map();
+function dedupeRequests(keyGenerator) {
+  return (req, res, next) => {
+    const key = keyGenerator(req);
+    if (pendingRequests.has(key)) {
+      pendingRequests.get(key).push(res);
+      return;
+    }
+    pendingRequests.set(key, [res]);
+    
+    const originalJson = res.json.bind(res);
+    res.json = (data) => {
+      const responses = pendingRequests.get(key) || [];
+      pendingRequests.delete(key);
+      responses.forEach(r => originalJson.call(r, data));
+    };
+    
+    next();
+  };
+}
 
 // ─── Auth routes ──────────────────────────────────────────────────────────────
 app.get('/auth/steam',
