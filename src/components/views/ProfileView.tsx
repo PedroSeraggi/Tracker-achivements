@@ -1,7 +1,8 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import { useAppStore, selectGlobalStats } from '../../store/useAppStore';
 import { Avatar, ProgressBar, Empty } from '../ui';
 import { useProfileData, bgImageUrl, bgVideoUrl, gameIconUrl, formatPlaytime } from '../../hooks/useProfileData';
+import { fetchPlayerFriends, type PlayerFriend } from '../../api/steamApi';
 import type { Game, Achievement, FeaturedType, FeaturedCard, FeaturedSection } from '../../types';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -648,6 +649,38 @@ const ProfileView: React.FC = () => {
   React.useEffect(() => {
     setVideoFailed(false);
   }, [background?.communityitemid]);
+
+  // ── Friends state ──────────────────────────────────────────────────────────
+  const [friends, setFriends] = useState<PlayerFriend[]>([]);
+  const [friendsLoading, setFriendsLoading] = useState(false);
+  const dashView = useAppStore((s) => s.dashView);
+  const setDashView = useAppStore((s) => s.setDashView);
+
+  // Fetch friends when profile is shown
+  useEffect(() => {
+    if (!currentUser?.steamId || dashView !== 'profile') return;
+    setFriendsLoading(true);
+    fetchPlayerFriends(currentUser.steamId)
+      .then((data) => {
+        setFriends(data);
+        console.log('[ProfileView] Friends loaded:', data.length);
+      })
+      .catch((err) => {
+        console.error('[ProfileView] Failed to load friends:', err);
+        setFriends([]);
+      })
+      .finally(() => setFriendsLoading(false));
+  }, [currentUser?.steamId, dashView]);
+
+  const handleFriendClick = useCallback((friend: PlayerFriend) => {
+    // Navigate to search view with this friend
+    setDashView('search');
+    // Store the friend data temporarily and trigger search
+    setTimeout(() => {
+      const event = new CustomEvent('searchPlayer', { detail: { steamId: friend.steamId, personaName: friend.personaName } });
+      window.dispatchEvent(event);
+    }, 100);
+  }, [setDashView]);
 
   // ── Derived ──────────────────────────────────────────────────────────────
   const xp    = useMemo(() => calcXP(games), [games]);
@@ -1336,6 +1369,93 @@ const ProfileView: React.FC = () => {
             </div>
           </div>
         </section>
+
+      {/* ═══════════════════════════════════════════════════════════════════
+          SEÇÃO: AMIGOS (scrollable list)
+          ═══════════════════════════════════════════════════════════════ */}
+      <section className="profile-section" style={{ marginTop: 24 }}>
+        <h3 className="profile-section-title">👥 Amigos Steam</h3>
+        
+        {friendsLoading ? (
+          <div style={{ padding: 20, textAlign: 'center', color: 'var(--txt2)' }}>
+            ⏳ Carregando amigos...
+          </div>
+        ) : friends.length === 0 ? (
+          <Empty icon="👥" title="Nenhum amigo encontrado" />
+        ) : (
+          <div style={{ marginTop: 16 }}>
+            <div style={{ fontSize: 12, color: 'var(--txt3)', marginBottom: 12 }}>
+              {friends.length} amigo{friends.length !== 1 ? 's' : ''} encontrado{friends.length !== 1 ? 's' : ''}
+              {friends.some(f => f.totalAch != null) && ' · Alguns sincronizados no leaderboard'}
+            </div>
+            <div 
+              className="pp-friends-list"
+              style={{
+                maxHeight: 320,
+                overflowY: 'auto',
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))',
+                gap: 12,
+                padding: 4,
+              }}
+            >
+              {friends.map((friend) => (
+                <div
+                  key={friend.steamId}
+                  className="pp-friend-card"
+                  onClick={() => handleFriendClick(friend)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 12,
+                    padding: 12,
+                    background: 'rgba(255,255,255,0.03)',
+                    borderRadius: 8,
+                    border: '1px solid rgba(255,255,255,0.06)',
+                    transition: 'all 0.2s',
+                    cursor: 'pointer',
+                  }}
+                  title={`Clique para ver o perfil de ${friend.personaName}`}
+                >
+                  <Avatar src={friend.avatarUrl} size={40} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div 
+                      style={{ 
+                        fontSize: 13, 
+                        fontWeight: 600, 
+                        color: 'var(--txt1)',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                      }}
+                    >
+                      {friend.personaName}
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--txt3)', marginTop: 2 }}>
+                      {friend.isPrivate ? (
+                        <span style={{ color: '#f87171' }}>🔒 Privado</span>
+                      ) : friend.totalAch != null ? (
+                        <span style={{ color: '#60a5fa' }}>
+                          🏆 {friend.totalAch?.toLocaleString('pt-BR')} conquistas
+                          {friend.platCount ? ` · ${friend.platCount}⭐` : ''}
+                        </span>
+                      ) : (
+                        <span>Não sincronizado</span>
+                      )}
+                    </div>
+                  </div>
+                  <span style={{ fontSize: 14, color: 'var(--txt3)' }}>→</span>
+                </div>
+              ))}
+            </div>
+            {friends.length > 6 && (
+              <div style={{ fontSize: 11, color: 'var(--txt3)', textAlign: 'center', marginTop: 8 }}>
+                Role para ver mais amigos ↓
+              </div>
+            )}
+          </div>
+        )}
+      </section>
 
       </div>{/* /profile-content */}
 

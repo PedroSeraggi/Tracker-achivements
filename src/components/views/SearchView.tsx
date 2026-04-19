@@ -10,7 +10,7 @@
 //  Nenhuma mudança de store necessária.
 // =============================================================================
 
-import React, { useRef } from 'react';
+import React, { useRef, useEffect } from 'react';
 import {
   useAppStore,
   selectFilteredSearchGames,
@@ -53,6 +53,18 @@ const SearchHome: React.FC = () => {
     const q = query.trim();
     if (q && !searchLoading) search(q);
   };
+
+  // Listen for custom search event from friend clicks
+  useEffect(() => {
+    const handleSearchPlayer = (e: CustomEvent<{ steamId: string; personaName: string }>) => {
+      const { steamId } = e.detail;
+      // Search by steamId directly
+      setQuery(steamId);
+      setTimeout(() => search(steamId), 50);
+    };
+    window.addEventListener('searchPlayer', handleSearchPlayer as EventListener);
+    return () => window.removeEventListener('searchPlayer', handleSearchPlayer as EventListener);
+  }, [search, setQuery]);
 
   return (
     <div id="search-home-view">

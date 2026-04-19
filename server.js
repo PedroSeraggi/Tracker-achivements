@@ -596,6 +596,64 @@ app.post('/api/leaderboard/register/:steamId', requireAuth, async (req, res) => 
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+//  GET /api/player/:steamId/friends
+//  Retorna a lista de amigos de qualquer jogador (para mostrar no perfil).
+//  Se o perfil for privado, retorna array vazio.
+// ─────────────────────────────────────────────────────────────────────────────
+app.get('/api/player/:steamId/friends', requireAuth, async (req, res) => {
+  const { steamId } = req.params;
+
+  try {
+    // 1. Busca lista de amigos do Steam
+    let friendIds = [];
+    try {
+      const fData = await steamGet('/ISteamUser/GetFriendList/v1/', {
+        steamid: steamId,
+        relationship: 'friend',
+      });
+      friendIds = (fData?.friendslist?.friends ?? [])
+        .map((f) => f.steamid)
+        .slice(0, 100); // Limita a 100 amigos
+    } catch {
+      // Perfil privado ou sem amigos visíveis
+      return res.json([]);
+    }
+
+    if (friendIds.length === 0) return res.json([]);
+
+    // 2. Busca informações dos amigos (nome, avatar)
+    const summaryData = await steamGet('/ISteamUser/GetPlayerSummaries/v2/', {
+      steamids: friendIds.join(','),
+    });
+    const players = summaryData?.response?.players ?? [];
+
+    // 3. Busca stats dos amigos que estão no SQLite (leaderboard)
+    const friendIdsInDb = db.getPlayersByIds ? db.getPlayersByIds(friendIds) : [];
+
+    // 4. Monta resultado combinando Steam + SQLite
+    const result = players.map((p) => {
+      const dbData = friendIdsInDb.find((x) => x.steamId === p.steamid);
+      return {
+        steamId: p.steamid,
+        personaName: p.personaname,
+        avatarUrl: p.avatarfull,
+        profileUrl: p.profileurl,
+        isPrivate: p.communityvisibilitystate < 3,
+        // Stats do SQLite (se estiver registrado)
+        totalAch: dbData?.totalAch ?? null,
+        platCount: dbData?.platCount ?? null,
+        gameCount: dbData?.gameCount ?? null,
+      };
+    });
+
+    return res.json(result);
+  } catch (err) {
+    console.error('[Player] Erro ao buscar amigos:', err.message);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 //  GET /api/leaderboard/global?page=1&limit=50
 //  Retorna o ranking global de todos os usuários registrados no SQLite.
 //  Paginado. Inclui flag isMe para o usuário logado.

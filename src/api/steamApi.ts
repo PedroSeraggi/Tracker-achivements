@@ -226,6 +226,27 @@ export async function registerLeaderboardStats(stats: {
   });
 }
 
+export interface PlayerFriend {
+  steamId: string;
+  personaName: string;
+  avatarUrl: string;
+  profileUrl: string;
+  isPrivate: boolean;
+  totalAch: number | null;
+  platCount: number | null;
+  gameCount: number | null;
+}
+
+/**
+ * Busca a lista de amigos de qualquer jogador.
+ * Se o perfil for privado, retorna array vazio.
+ */
+export async function fetchPlayerFriends(steamId: string): Promise<PlayerFriend[]> {
+  const res = await fetch(`/api/player/${steamId}/friends`, { credentials: 'include' });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
 /**
  * Sincroniza os dados de um jogador pesquisado no leaderboard.
  * Usado quando você pesquisa um amigo e quer adicionar ele ao ranking.

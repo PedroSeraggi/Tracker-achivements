@@ -4,7 +4,7 @@ import React, { useMemo, useCallback, useState, useEffect } from 'react';
 import { useAppStore, selectFilteredSearchGames } from '../../store/useAppStore';
 import { Avatar, FilterBar, Empty, ProgressBar } from '../ui';
 import GameCard from '../dashboard/GameCard';
-import { fetchPlayerBackground, syncPlayerToLeaderboard } from '../../api/steamApi';
+import { fetchPlayerBackground, syncPlayerToLeaderboard, fetchPlayerFriends, type PlayerFriend } from '../../api/steamApi';
 import { bgImageUrl, bgVideoUrl, type ProfileBackground } from '../../hooks/useProfileData';
 import type { Game, GameFilter, Achievement } from '../../types';
 
@@ -72,25 +72,23 @@ const PlayerGamesSection: React.FC<{
   const [activeTab, setActiveTab] = useState<GameTab>('recent');
   const [isMinimized, setIsMinimized] = useState(false);
 
-  // Jogos ordenados por tempo de jogo (mais jogados primeiro)
+  // Jogos ordenados por tempo de jogo (mais jogados primeiro) - limitado a 10
   const recentGames = useMemo(() => 
-    [...games].sort((a, b) => b.playtimeForever - a.playtimeForever).slice(0, 6),
+    [...games].sort((a, b) => b.playtimeForever - a.playtimeForever).slice(0, 10),
     [games]
   );
 
   // Jogos em progresso (com conquistas mas não platinado)
   const playingGames = useMemo(() => 
     games.filter(g => g.unlockedCount > 0 && g.percentage < 100)
-         .sort((a, b) => b.percentage - a.percentage)
-         .slice(0, 6),
+         .sort((a, b) => b.percentage - a.percentage),
     [games]
   );
 
   // Jogos platinados
   const platinumGames = useMemo(() => 
     games.filter(g => g.trophyTier === 'platinum')
-         .sort((a, b) => b.playtimeForever - a.playtimeForever)
-         .slice(0, 6),
+         .sort((a, b) => b.playtimeForever - a.playtimeForever),
     [games]
   );
 
@@ -373,7 +371,7 @@ const TopGamesCarousel: React.FC<{
 };
 
 /** Seção de Jogos Platinados com Top 5 Conquistas mais Difíceis */
-const PerfectGamesSection: React.FC<{
+const PlatinumGamesSection: React.FC<{
   games: Game[];
   onOpenGame: (appId: number) => void;
 }> = ({ games, onOpenGame }) => {
@@ -385,6 +383,15 @@ const PerfectGamesSection: React.FC<{
       .slice(0, 3),
     [games]
   );
+
+  const allPlatinumGames = useMemo(() => 
+    games
+      .filter(g => g.trophyTier === 'platinum' || g.percentage === 100)
+      .sort((a, b) => b.playtimeForever - a.playtimeForever),
+    [games]
+  );
+
+  const [showAllPlatinum, setShowAllPlatinum] = useState(false);
 
   if (platinumGames.length === 0) return null;
 
@@ -425,7 +432,7 @@ const PerfectGamesSection: React.FC<{
                 filter: 'brightness(0.4)',
               }} />
               <div className="perfect-game-glow" />
-              
+
               {/* Conteúdo */}
               <div style={{
                 position: 'relative', zIndex: 1,
@@ -433,27 +440,27 @@ const PerfectGamesSection: React.FC<{
                 display: 'flex', gap: 16, alignItems: 'center',
                 minHeight: 200,
               }}>
-                <img 
-                  src={g.headerImage} 
+                <img
+                  src={g.headerImage}
                   alt={g.name}
-                  style={{ 
-                    width: 120, height: 56, 
-                    objectFit: 'cover', borderRadius: 8, 
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.5)' 
-                  }} 
+                  style={{
+                    width: 120, height: 56,
+                    objectFit: 'cover', borderRadius: 8,
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.5)'
+                  }}
                 />
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ 
-                    fontWeight: 800, fontSize: 18, 
-                    overflow: 'hidden', textOverflow: 'ellipsis', 
-                    whiteSpace: 'nowrap', textShadow: '0 2px 4px rgba(0,0,0,0.8)' 
+                  <div style={{
+                    fontWeight: 800, fontSize: 18,
+                    overflow: 'hidden', textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap', textShadow: '0 2px 4px rgba(0,0,0,0.8)'
                   }}>
                     {g.name}
                   </div>
-                  <div style={{ 
-                    fontSize: 13, color: '#00ffff', marginTop: 6, 
+                  <div style={{
+                    fontSize: 13, color: '#00ffff', marginTop: 6,
                     display: 'flex', alignItems: 'center', gap: 8,
-                    textShadow: '0 0 10px rgba(0,255,255,0.5)' 
+                    textShadow: '0 0 10px rgba(0,255,255,0.5)'
                   }}>
                     <span style={{ fontSize: 16 }}>💎</span>
                     <span>Perfeito · {g.unlockedCount}/{g.totalCount} conquistas · {Math.round(g.playtimeForever / 60)}h jogadas</span>
@@ -462,7 +469,7 @@ const PerfectGamesSection: React.FC<{
                     <ProgressBar percent={g.percentage} height={6} />
                   </div>
                 </div>
-                
+
                 {/* Top 5 conquistas mais difíceis */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -480,18 +487,18 @@ const PerfectGamesSection: React.FC<{
                         <img
                           src={ach.achieved ? ach.iconUrl : ach.iconGrayUrl}
                           alt={ach.displayName}
-                          style={{ 
-                            width: '100%', height: '100%', 
-                            objectFit: 'cover', 
-                            opacity: ach.achieved ? 1 : 0.5 
+                          style={{
+                            width: '100%', height: '100%',
+                            objectFit: 'cover',
+                            opacity: ach.achieved ? 1 : 0.5
                           }}
                         />
                       </div>
                     ))}
                   </div>
-                  <div style={{ 
+                  <div style={{
                     fontWeight: 900, color: '#00ffff', fontSize: 28,
-                    textShadow: '0 0 20px #00ffff, 0 0 40px rgba(0,255,255,0.5)' 
+                    textShadow: '0 0 20px #00ffff, 0 0 40px rgba(0,255,255,0.5)'
                   }}>
                     100%
                   </div>
@@ -500,6 +507,188 @@ const PerfectGamesSection: React.FC<{
             </div>
           );
         })}
+
+        {/* Botão Ver Todos */}
+        {allPlatinumGames.length > 3 && (
+          <button
+            onClick={() => setShowAllPlatinum(true)}
+            style={{
+              marginTop: 8,
+              padding: '12px 24px',
+              background: 'rgba(0, 255, 255, 0.1)',
+              border: '1px solid rgba(0, 255, 255, 0.3)',
+              borderRadius: 8,
+              color: '#00ffff',
+              fontSize: 14,
+              fontWeight: 600,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+              transition: 'all 0.2s',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(0, 255, 255, 0.2)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'rgba(0, 255, 255, 0.1)';
+            }}
+          >
+            <span>💎</span>
+            Ver todos os {allPlatinumGames.length} jogos perfeitos
+            <span>→</span>
+          </button>
+        )}
+
+        {/* Modal com todos os jogos platinados */}
+        {showAllPlatinum && (
+          <div
+            onClick={() => setShowAllPlatinum(false)}
+            style={{
+              position: 'fixed', inset: 0,
+              background: 'rgba(0,0,0,0.85)',
+              backdropFilter: 'blur(8px)',
+              zIndex: 1000,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              padding: 20,
+            }}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                background: 'var(--bg1)',
+                border: '1px solid rgba(0, 255, 255, 0.3)',
+                borderRadius: 16,
+                padding: '24px',
+                maxWidth: 900,
+                width: '100%',
+                maxHeight: '85vh',
+                overflowY: 'auto',
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                <h2 style={{ fontSize: 22, fontWeight: 700, margin: 0, color: '#00ffff', textShadow: '0 0 10px rgba(0,255,255,0.5)' }}>
+                  💎 Todos os Jogos Perfeitos ({allPlatinumGames.length})
+                </h2>
+                <button
+                  onClick={() => setShowAllPlatinum(false)}
+                  style={{ background: 'transparent', border: 'none', fontSize: 24, color: 'var(--txt2)', cursor: 'pointer', padding: '0 8px' }}
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                {allPlatinumGames.map(g => {
+                  const topAchievements = g.achievements
+                    ?.filter(a => a.globalPercent != null)
+                    ?.sort((a, b) => (a.globalPercent || 100) - (b.globalPercent || 100))
+                    ?.slice(0, 5) || [];
+
+                  return (
+                    <div
+                      key={g.appId}
+                      onClick={() => {
+                        onOpenGame(g.appId);
+                        setShowAllPlatinum(false);
+                      }}
+                      className="perfect-game-banner"
+                      style={{
+                        position: 'relative',
+                        borderRadius: 16,
+                        overflow: 'hidden',
+                        cursor: 'pointer',
+                        minHeight: 160,
+                      }}
+                    >
+                      {/* Background */}
+                      <div style={{
+                        position: 'absolute', inset: 0,
+                        backgroundImage: `url(${g.heroImage})`,
+                        backgroundSize: 'cover', backgroundPosition: 'center',
+                        filter: 'brightness(0.4)',
+                      }} />
+                      <div className="perfect-game-glow" />
+
+                      {/* Conteúdo */}
+                      <div style={{
+                        position: 'relative', zIndex: 1,
+                        padding: '16px 20px',
+                        display: 'flex', gap: 16, alignItems: 'center',
+                        minHeight: 160,
+                      }}>
+                        <img
+                          src={g.headerImage}
+                          alt={g.name}
+                          style={{
+                            width: 100, height: 48,
+                            objectFit: 'cover', borderRadius: 8,
+                            boxShadow: '0 4px 12px rgba(0,0,0,0.5)'
+                          }}
+                        />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{
+                            fontWeight: 700, fontSize: 16,
+                            overflow: 'hidden', textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap', textShadow: '0 2px 4px rgba(0,0,0,0.8)'
+                          }}>
+                            {g.name}
+                          </div>
+                          <div style={{
+                            fontSize: 12, color: '#00ffff', marginTop: 4,
+                            display: 'flex', alignItems: 'center', gap: 8,
+                            textShadow: '0 0 10px rgba(0,255,255,0.5)'
+                          }}>
+                            <span style={{ fontSize: 14 }}>💎</span>
+                            <span>Perfeito · {g.unlockedCount}/{g.totalCount} conquistas · {Math.round(g.playtimeForever / 60)}h jogadas</span>
+                          </div>
+                          <div style={{ marginTop: 8, maxWidth: 250 }}>
+                            <ProgressBar percent={g.percentage} height={4} />
+                          </div>
+                        </div>
+
+                        {/* Top conquistas */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                            {topAchievements.slice(0, 4).map(ach => (
+                              <div
+                                key={ach.apiName}
+                                title={`${ach.displayName} — ${ach.globalPercent?.toFixed(1)}% dos jogadores`}
+                                style={{
+                                  width: 28, height: 28, borderRadius: 4,
+                                  border: ach.achieved ? '1px solid #00ffff' : '1px solid var(--txt3)',
+                                  boxShadow: ach.achieved ? '0 0 6px rgba(0,255,255,0.4)' : 'none',
+                                  overflow: 'hidden', cursor: 'help',
+                                }}
+                              >
+                                <img
+                                  src={ach.achieved ? ach.iconUrl : ach.iconGrayUrl}
+                                  alt={ach.displayName}
+                                  style={{
+                                    width: '100%', height: '100%',
+                                    objectFit: 'cover',
+                                    opacity: ach.achieved ? 1 : 0.5
+                                  }}
+                                />
+                              </div>
+                            ))}
+                          </div>
+                          <div style={{
+                            fontWeight: 900, color: '#00ffff', fontSize: 24,
+                            textShadow: '0 0 20px #00ffff, 0 0 40px rgba(0,255,255,0.5)'
+                          }}>
+                            100%
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </section>
   );
@@ -557,6 +746,26 @@ const PlayerProfilePage: React.FC = () => {
       });
   }, [searchedPlayer?.user?.steamId]);
 
+  // ── Friends state ──────────────────────────────────────────────────────────
+  const [friends, setFriends] = useState<PlayerFriend[]>([]);
+  const [friendsLoading, setFriendsLoading] = useState(false);
+
+  // Fetch friends when profile loads
+  useEffect(() => {
+    if (!searchedPlayer?.user?.steamId) return;
+    setFriendsLoading(true);
+    fetchPlayerFriends(searchedPlayer.user.steamId)
+      .then((data) => {
+        setFriends(data);
+        console.log('[PlayerProfile] Friends loaded:', data.length);
+      })
+      .catch((err) => {
+        console.error('[PlayerProfile] Failed to load friends:', err);
+        setFriends([]);
+      })
+      .finally(() => setFriendsLoading(false));
+  }, [searchedPlayer?.user?.steamId]);
+
   // ── Early-exit guards ─────────────────────────────────────────────────────
   if (!searchedPlayer) return null;
   const { user, games } = searchedPlayer;
@@ -565,6 +774,17 @@ const PlayerProfilePage: React.FC = () => {
   // ── Sync state ─────────────────────────────────────────────────────────────
   const [syncing, setSyncing] = useState(false);
   const [synced, setSynced] = useState(false);
+
+  // ── Handle friend click (search on site) ───────────────────────────────────
+  const handleFriendClick = useCallback((friend: PlayerFriend) => {
+    // Navigate to search view with this friend
+    setSearchView('home');
+    // Store the friend data temporarily and trigger search
+    setTimeout(() => {
+      const event = new CustomEvent('searchPlayer', { detail: { steamId: friend.steamId, personaName: friend.personaName } });
+      window.dispatchEvent(event);
+    }, 100);
+  }, [setSearchView]);
 
   const handleSyncToLeaderboard = useCallback(async () => {
     if (!user || games.length === 0 || syncing) return;
@@ -794,7 +1014,7 @@ const PlayerProfilePage: React.FC = () => {
       {/* ═══════════════════════════════════════════════════════════════════
           SEÇÃO: JOGOS PLATINADOS COM 5 CONQUISTAS MAIS DIFÍCEIS
           ═══════════════════════════════════════════════════════════════ */}
-      <PerfectGamesSection games={games} onOpenGame={openGame} />
+      <PlatinumGamesSection games={games} onOpenGame={openGame} />
 
       {/* ═══════════════════════════════════════════════════════════════════
           SEÇÃO: JOGOS COM SUBABAS
@@ -864,6 +1084,93 @@ const PlayerProfilePage: React.FC = () => {
             </div>
           </div>
         </div>
+      </section>
+
+      {/* ═══════════════════════════════════════════════════════════════════
+          SEÇÃO: AMIGOS (scrollable list)
+          ═══════════════════════════════════════════════════════════════ */}
+      <section className="profile-section">
+        <h3 className="profile-section-title">👥 Amigos Steam</h3>
+        
+        {friendsLoading ? (
+          <div style={{ padding: 20, textAlign: 'center', color: 'var(--txt2)' }}>
+            ⏳ Carregando amigos...
+          </div>
+        ) : friends.length === 0 ? (
+          <Empty icon="👥" title="Nenhum amigo encontrado" />
+        ) : (
+          <div style={{ marginTop: 16 }}>
+            <div style={{ fontSize: 12, color: 'var(--txt3)', marginBottom: 12 }}>
+              {friends.length} amigo{friends.length !== 1 ? 's' : ''} encontrado{friends.length !== 1 ? 's' : ''}
+              {friends.some(f => f.totalAch != null) && ' · Alguns sincronizados no leaderboard'}
+            </div>
+            <div 
+              className="pp-friends-list"
+              style={{
+                maxHeight: 320,
+                overflowY: 'auto',
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))',
+                gap: 12,
+                padding: 4,
+              }}
+            >
+              {friends.map((friend) => (
+                <div
+                  key={friend.steamId}
+                  className="pp-friend-card"
+                  onClick={() => handleFriendClick(friend)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 12,
+                    padding: 12,
+                    background: 'rgba(255,255,255,0.03)',
+                    borderRadius: 8,
+                    border: '1px solid rgba(255,255,255,0.06)',
+                    transition: 'all 0.2s',
+                    cursor: 'pointer',
+                  }}
+                  title={`Clique para ver o perfil de ${friend.personaName}`}
+                >
+                  <Avatar src={friend.avatarUrl} size={40} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div
+                      style={{
+                        fontSize: 13,
+                        fontWeight: 600,
+                        color: 'var(--txt1)',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                      }}
+                    >
+                      {friend.personaName}
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--txt3)', marginTop: 2 }}>
+                      {friend.isPrivate ? (
+                        <span style={{ color: '#f87171' }}>🔒 Privado</span>
+                      ) : friend.totalAch != null ? (
+                        <span style={{ color: '#60a5fa' }}>
+                          🏆 {friend.totalAch?.toLocaleString('pt-BR')} conquistas
+                          {friend.platCount ? ` · ${friend.platCount}⭐` : ''}
+                        </span>
+                      ) : (
+                        <span>Não sincronizado</span>
+                      )}
+                    </div>
+                  </div>
+                  <span style={{ fontSize: 14, color: 'var(--txt3)' }}>→</span>
+                </div>
+              ))}
+            </div>
+            {friends.length > 6 && (
+              <div style={{ fontSize: 11, color: 'var(--txt3)', textAlign: 'center', marginTop: 8 }}>
+                Role para ver mais amigos ↓
+              </div>
+            )}
+          </div>
+        )}
       </section>
     </div>
     </div>
